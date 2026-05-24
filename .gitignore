@@ -1,0 +1,8 @@
+.env.prod
+.env
+*.pem
+*.key
+*.sql
+*.dump
+backups/
+data/

@@ -1,0 +1,78 @@
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?set SITE_DOMAIN in .env.prod}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env.prod}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  frontend:
+    build:
+      context: ./silver-tour-app
+      args:
+        VITE_API_BASE_URL: ""
+    restart: unless-stopped
+    expose:
+      - "80"
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-silver}
+      DB_USERNAME: ${POSTGRES_USER:-silver}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.prod}
+      SPRING_DOCKER_COMPOSE_ENABLED: "false"
+      JAVA_OPTS: ${JAVA_OPTS:-}
+    expose:
+      - "8080"
+    volumes:
+      - collector-data:/data:ro
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-silver}
+      POSTGRES_USER: ${POSTGRES_USER:-silver}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.prod}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-silver} -d ${POSTGRES_DB:-silver}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  collector:
+    build:
+      context: ./silver-data-collector
+    profiles:
+      - jobs
+    environment:
+      DATA_GO_KR_SERVICE_KEY: ${DATA_GO_KR_SERVICE_KEY:?set DATA_GO_KR_SERVICE_KEY in .env.prod}
+      DISASTER_SAFETY_SERVICE_KEY: ${DISASTER_SAFETY_SERVICE_KEY:-}
+      MFDS_SERVICE_KEY: ${MFDS_SERVICE_KEY:-}
+      CLIENT_SIDE_REGION_SCAN_PAGES: ${CLIENT_SIDE_REGION_SCAN_PAGES:-10}
+      SENIOR_JOBS_PROJECT_YEAR: ${SENIOR_JOBS_PROJECT_YEAR:-}
+    volumes:
+      - collector-data:/app/data
+
+volumes:
+  caddy-data:
+  caddy-config:
+  postgres-data:
+  collector-data:
