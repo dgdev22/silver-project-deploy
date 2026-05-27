@@ -103,6 +103,27 @@ cd ~/apps/silverProject/deploy
 ./scripts/refresh-data.sh
 ```
 
+cron 설치:
+
+```bash
+cd ~/apps/silverProject/deploy
+SILVER_REFRESH_REGIONS="강릉" ./scripts/install-cron.sh
+```
+
+지역 하나를 즉시 수집:
+
+```bash
+cd ~/apps/silverProject/deploy
+./scripts/refresh-region.sh 강릉 20
+```
+
+여러 지역을 한 번에 수집:
+
+```bash
+cd ~/apps/silverProject/deploy
+SILVER_REFRESH_MODE=core SILVER_REFRESH_REGIONS="강릉,서울 강남구,부산 해운대구" SILVER_REFRESH_LIMIT=20 ./scripts/refresh-data.sh
+```
+
 ## 주의
 
 - GitHub Actions deploy는 앱 재배포만 수행한다.

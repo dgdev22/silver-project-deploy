@@ -189,6 +189,28 @@ docker compose --env-file .env.prod -f compose.prod.yaml run --rm collector \
   silver-data-collector collect-food-safety --limit 5
 ```
 
+운영에서는 deploy repo의 wrapper를 쓰면 된다.
+
+```bash
+cd ~/apps/silverProject/deploy
+SILVER_REFRESH_MODE=full SILVER_REFRESH_REGIONS="강릉" SILVER_REFRESH_LIMIT=5 ./scripts/refresh-data.sh
+```
+
+강릉 외 지역을 바로 추가하려면:
+
+```bash
+cd ~/apps/silverProject/deploy
+./scripts/refresh-region.sh "서울 강남구" 20
+./scripts/refresh-region.sh "부산 해운대구" 20
+```
+
+여러 지역을 한 번에 돌릴 수도 있다.
+
+```bash
+cd ~/apps/silverProject/deploy
+SILVER_REFRESH_MODE=core SILVER_REFRESH_REGIONS="강릉,서울 강남구,부산 해운대구" SILVER_REFRESH_LIMIT=20 ./scripts/refresh-data.sh
+```
+
 점수 생성:
 
 ```bash
@@ -241,6 +263,34 @@ docker compose --env-file .env.prod -f compose.prod.yaml exec -T postgres \
 ```
 
 Lightsail console에서 automatic snapshot도 켠다. 운영 초기는 매일 snapshot을 권장한다.
+
+## 12-1. Cron 등록
+
+운영 사이트가 정상으로 보이면 cron을 등록한다.
+
+```bash
+cd ~/apps/silverProject/deploy
+SILVER_REFRESH_REGIONS="강릉" ./scripts/install-cron.sh
+```
+
+기본 cron:
+
+- 매일 03:00 core 데이터 갱신
+- 매주 월요일 04:30 식의약 데이터 갱신
+
+지역을 추가하고 싶으면 다시 실행한다.
+
+```bash
+cd ~/apps/silverProject/deploy
+SILVER_REFRESH_REGIONS="강릉,서울 강남구,부산 해운대구" ./scripts/install-cron.sh
+```
+
+로그:
+
+```bash
+tail -f ~/apps/silverProject/logs/refresh-core.log
+tail -f ~/apps/silverProject/logs/refresh-food.log
+```
 
 ## 13. 업데이트 배포
 
