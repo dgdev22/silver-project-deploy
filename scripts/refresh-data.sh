@@ -20,6 +20,13 @@ run_collector() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm collector "$@"
 }
 
+first_region() {
+  local region="${REGIONS%%,*}"
+  region="${region#"${region%%[![:space:]]*}"}"
+  region="${region%"${region##*[![:space:]]}"}"
+  echo "$region"
+}
+
 refresh_region() {
   local region="$1"
 
@@ -31,8 +38,11 @@ refresh_region() {
 }
 
 refresh_food_safety() {
-  echo "Refreshing FoodSafetyKorea data"
-  run_collector silver-data-collector collect-food-safety --limit "$LIMIT" --pause-seconds "$MFDS_PAUSE_SECONDS"
+  local region
+  region="$(first_region)"
+
+  echo "Refreshing FoodSafetyKorea data for restaurants in: $region"
+  run_collector silver-data-collector collect-food-safety --region "$region" --limit "$LIMIT" --pause-seconds "$MFDS_PAUSE_SECONDS"
 }
 
 case "$MODE" in
