@@ -1,0 +1,26 @@
+name: Refresh public data
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: silver-data-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.LIGHTSAIL_SSH_KEY }}" > ~/.ssh/lightsail_key
+          chmod 600 ~/.ssh/lightsail_key
+          ssh-keyscan -H "${{ secrets.LIGHTSAIL_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Refresh data on Lightsail
+        run: |
+          ssh -i ~/.ssh/lightsail_key \
+            "${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}" \
+            'bash -lc "cd ~/apps/silverProject/deploy && git pull --ff-only && chmod +x scripts/*.sh && ./scripts/refresh-data.sh"'

@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_DIR="${SILVER_APP_DIR:-$HOME/apps/silverProject}"
+COMPOSE_FILE="${COMPOSE_FILE:-compose.prod.yaml}"
+ENV_FILE="${ENV_FILE:-.env.prod}"
+
+cd "$APP_DIR"
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "Missing $APP_DIR/$ENV_FILE" >&2
+  exit 1
+fi
+
+pull_repo() {
+  local path="$1"
+
+  if [ ! -d "$path/.git" ]; then
+    echo "Skipping $path: not a git repository"
+    return
+  fi
+
+  echo "Updating $path"
+  git -C "$path" fetch origin main
+  git -C "$path" reset --hard origin/main
+}
+
+pull_repo deploy
+
+cp deploy/compose.prod.yaml "$COMPOSE_FILE"
+cp deploy/Caddyfile Caddyfile
+
+pull_repo silver-data-collector
+pull_repo backend
+pull_repo silver-tour-app
+
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build backend frontend collector
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d postgres backend frontend caddy
+
+docker image prune -f
+
+echo "Deployment complete."
