@@ -27,19 +27,19 @@ GitHub main push
 
 | Secret | Value |
 |---|---|
-| `LIGHTSAIL_HOST` | `43.200.63.172` |
-| `LIGHTSAIL_USER` | `ubuntu` |
+| `LIGHTSAIL_HOST` | `43.200.63.172` 또는 `ubuntu@43.200.63.172` |
+| `LIGHTSAIL_USER` | `ubuntu`. 단, `LIGHTSAIL_HOST`에 `ubuntu@`를 포함했다면 생략 가능 |
 | `LIGHTSAIL_SSH_KEY` | Lightsail 서버에 접속 가능한 private key 전체 |
 
 GitHub repository의 Settings -> Secrets and variables -> Actions -> New repository secret에서 추가한다.
 
-그리고 같은 화면의 Variables 탭에서 아래 repository variable을 추가한다.
+같은 화면의 Variables 탭에서 아래 repository variable을 선택적으로 추가할 수 있다.
 
 | Variable | Value |
 |---|---|
-| `LIGHTSAIL_DEPLOY_ENABLED` | `true` |
+| `LIGHTSAIL_DEPLOY_ENABLED` | `false`로 두면 자동 배포를 일시 중지 |
 
-이 variable을 넣기 전에는 workflow가 push되어도 배포 job이 실행되지 않는다. secrets를 넣기 전에 workflow가 실패하는 것을 막기 위한 안전장치다.
+현재 workflow는 기본적으로 main push 시 배포를 실행한다. 임시로 막고 싶을 때만 `LIGHTSAIL_DEPLOY_ENABLED=false`를 넣는다.
 
 ## SSH Key 권장 방식
 

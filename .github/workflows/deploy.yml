@@ -13,18 +13,40 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ vars.LIGHTSAIL_DEPLOY_ENABLED == 'true' }}
+    if: ${{ vars.LIGHTSAIL_DEPLOY_ENABLED != 'false' }}
 
     steps:
+      - name: Prepare SSH config
+        env:
+          LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
+        run: |
+          set -euo pipefail
+          if [ -z "$LIGHTSAIL_HOST" ]; then
+            echo "LIGHTSAIL_HOST secret is required." >&2
+            exit 1
+          fi
+          if [[ "$LIGHTSAIL_HOST" == *@* ]]; then
+            echo "SSH_TARGET=$LIGHTSAIL_HOST" >> "$GITHUB_ENV"
+            echo "SSH_HOST=${LIGHTSAIL_HOST#*@}" >> "$GITHUB_ENV"
+          else
+            if [ -z "$LIGHTSAIL_USER" ]; then
+              echo "LIGHTSAIL_USER secret is required when LIGHTSAIL_HOST has no user." >&2
+              exit 1
+            fi
+            echo "SSH_TARGET=$LIGHTSAIL_USER@$LIGHTSAIL_HOST" >> "$GITHUB_ENV"
+            echo "SSH_HOST=$LIGHTSAIL_HOST" >> "$GITHUB_ENV"
+          fi
+
       - name: Install SSH key
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.LIGHTSAIL_SSH_KEY }}" > ~/.ssh/lightsail_key
           chmod 600 ~/.ssh/lightsail_key
-          ssh-keyscan -H "${{ secrets.LIGHTSAIL_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
       - name: Deploy on Lightsail
         run: |
           ssh -i ~/.ssh/lightsail_key \
-            "${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}" \
+            "$SSH_TARGET" \
             'bash -lc "cd ~/apps/silverProject/deploy && git pull --ff-only && chmod +x scripts/*.sh && ./scripts/deploy-app.sh"'
