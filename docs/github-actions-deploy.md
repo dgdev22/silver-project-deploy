@@ -59,7 +59,7 @@ cat ~/.ssh/github_actions_silver_deploy
 `silver-project-deploy`에는 두 workflow가 있다.
 
 - `.github/workflows/deploy.yml`: main push 또는 수동 실행 시 코드 배포
-- `.github/workflows/refresh-data.yml`: 수동 실행 시 공공데이터 재수집/import
+- `.github/workflows/refresh-data.yml`: 수동 실행 시 공공데이터 재수집/import. 기본 입력은 `mode=education`, `regions=강릉`, `limit=20`
 
 다른 repository도 main push마다 자동 배포하려면 같은 `deploy.yml`을 추가한다.
 
@@ -69,6 +69,15 @@ cat ~/.ssh/github_actions_silver_deploy
 - `silver-backend`
 - `silver-frontend`
 - `silver-project-deploy`
+
+교육 데이터만 빠르게 반영하려면 GitHub Actions에서 `Refresh public data`를 수동 실행하고 아래 입력을 사용한다.
+
+| Input | Recommended value |
+|---|---|
+| `mode` | `education` |
+| `regions` | `강릉` |
+| `limit` | `20` |
+| `mfds_pause_seconds` | `30` |
 
 ## 서버 쪽 전제
 

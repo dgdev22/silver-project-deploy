@@ -2,6 +2,23 @@ name: Refresh public data
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "Refresh mode: education, core, food, full"
+        required: true
+        default: "education"
+      regions:
+        description: "Comma-separated regions"
+        required: true
+        default: "강릉"
+      limit:
+        description: "Maximum records per source"
+        required: true
+        default: "20"
+      mfds_pause_seconds:
+        description: "Pause between MFDS calls when mode includes food"
+        required: true
+        default: "30"
 
 concurrency:
   group: silver-data-refresh
@@ -42,7 +59,12 @@ jobs:
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
       - name: Refresh data on Lightsail
+        env:
+          SILVER_REFRESH_MODE: ${{ inputs.mode }}
+          SILVER_REFRESH_REGIONS: ${{ inputs.regions }}
+          SILVER_REFRESH_LIMIT: ${{ inputs.limit }}
+          SILVER_MFDS_PAUSE_SECONDS: ${{ inputs.mfds_pause_seconds }}
         run: |
           ssh -i ~/.ssh/lightsail_key \
             "$SSH_TARGET" \
-            'bash -lc "cd ~/apps/silverProject/deploy && git pull --ff-only && chmod +x scripts/*.sh && ./scripts/refresh-data.sh"'
+            "SILVER_REFRESH_MODE='$SILVER_REFRESH_MODE' SILVER_REFRESH_REGIONS='$SILVER_REFRESH_REGIONS' SILVER_REFRESH_LIMIT='$SILVER_REFRESH_LIMIT' SILVER_MFDS_PAUSE_SECONDS='$SILVER_MFDS_PAUSE_SECONDS' bash -lc 'cd ~/apps/silverProject/deploy && git pull --ff-only && chmod +x scripts/*.sh && ./scripts/refresh-data.sh'"

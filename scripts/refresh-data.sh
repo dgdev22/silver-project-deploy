@@ -45,7 +45,23 @@ refresh_food_safety() {
   run_collector silver-data-collector collect-food-safety --region "$region" --limit "$LIMIT" --pause-seconds "$MFDS_PAUSE_SECONDS"
 }
 
+refresh_education() {
+  IFS="," read -ra region_list <<< "$REGIONS"
+  for region in "${region_list[@]}"; do
+    region="${region#"${region%%[![:space:]]*}"}"
+    region="${region%"${region##*[![:space:]]}"}"
+    if [ -n "$region" ]; then
+      echo "Refreshing education data for region: $region"
+      run_collector silver-data-collector collect-education-experience --region "$region" --limit "$LIMIT"
+    fi
+  done
+  run_collector silver-data-collector score-education-experience
+}
+
 case "$MODE" in
+  education)
+    refresh_education
+    ;;
   core)
     IFS="," read -ra region_list <<< "$REGIONS"
     for region in "${region_list[@]}"; do
@@ -72,7 +88,7 @@ case "$MODE" in
     run_collector silver-data-collector score-contest-menus
     ;;
   *)
-    echo "Unknown SILVER_REFRESH_MODE: $MODE. Use core, food, or full." >&2
+    echo "Unknown SILVER_REFRESH_MODE: $MODE. Use education, core, food, or full." >&2
     exit 1
     ;;
 esac
