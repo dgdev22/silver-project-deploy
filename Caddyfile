@@ -9,6 +9,10 @@
 		reverse_proxy backend:8080
 	}
 
+	handle /uploads/* {
+		reverse_proxy backend:8080
+	}
+
 	handle /internal/* {
 		respond 404
 	}

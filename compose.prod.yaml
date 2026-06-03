@@ -37,10 +37,12 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.prod}
       SPRING_DOCKER_COMPOSE_ENABLED: "false"
       JAVA_OPTS: ${JAVA_OPTS:-}
+      MEMORY_UPLOAD_DIR: /app/uploads/memory
     expose:
       - "8080"
     volumes:
       - collector-data:/data:ro
+      - memory-uploads:/app/uploads/memory
 
   postgres:
     image: postgres:17-alpine
@@ -76,3 +78,4 @@ volumes:
   caddy-config:
   postgres-data:
   collector-data:
+  memory-uploads:
