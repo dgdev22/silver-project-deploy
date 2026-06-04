@@ -7,7 +7,8 @@
 - 고인의 생애 페이지: 대표 사진, 한 줄 소개, 삶의 키워드, 타임라인, 기억 카드
 - 방명록: 방문자 작성, 승인 대기, 공개 글 표시
 - 유족 편집기: 기본 정보 수정, 사진 업로드, 공개 범위 변경, 방명록 승인/숨김/고정
-- 기억 카드 편집: 짧은 가족 이야기, 좋아했던 것, 영상/사진 링크 추가
+- 타임라인 편집: 중요한 순간 추가, 수정, 삭제
+- 기억 카드 편집: 짧은 가족 이야기, 좋아했던 것, 영상/사진 링크 추가, 수정, 삭제
 - 유족 코드: 편집/승인/편집기록 조회 전용 MVP 보호 장치
 - 가족 초대 링크: 함께 편집할 가족에게 만료 기간이 있는 초대 링크 발급, 목록 확인, 회수
 - 편집 기록: 누가 어떤 내용을 바꿨는지 유족끼리 확인
@@ -54,7 +55,11 @@ POST /api/memory/memorials/kim-youngsu/guestbook
 GET /api/memory/memorials/kim-youngsu?includeModeration=true
 PUT /api/memory/memorials/kim-youngsu
 POST /api/memory/memorials/kim-youngsu/life-events
+PATCH /api/memory/life-events/{id}
+DELETE /api/memory/life-events/{id}
 POST /api/memory/memorials/kim-youngsu/moments
+PATCH /api/memory/moments/{id}
+DELETE /api/memory/moments/{id}
 POST /api/memory/memorials/kim-youngsu/uploads
 POST /api/memory/memorials/kim-youngsu/editor-invites
 PATCH /api/memory/editor-invites/{id}
@@ -91,18 +96,16 @@ X-Memory-Editor-Token: demo-family-token
 
 ## 서비스 경계
 
-Silver Smile과 분리된 서비스로 운영하는 것을 전제로 합니다.
+현재 단계에서는 Silver Smile과 Silver Memory를 같은 Lightsail 서버와 Docker Compose 안에서 운영합니다.
 
 - `silver.loopmateapp.com`: 어르신 생활정보
-- `memory.loopmateapp.com`: 가족 기억 보관소
+- `silver.loopmateapp.com/memory/`: 가족 기억 보관소
 
-초기에는 같은 Lightsail 서버와 Docker Compose 안에서 별도 컨테이너로 운영할 수 있습니다.
+동접자와 운영 비용이 커지기 전까지는 모놀리식 운영을 유지합니다. 제품/브랜드가 충분히 검증되면 `memory.loopmateapp.com` 같은 별도 도메인 또는 별도 배포 단위로 분리할 수 있습니다.
 
 ## 운영 전 필수 작업
 
 - 유족 편집기 MVP 코드를 실제 로그인/초대 토큰으로 교체
 - 방명록 스팸 방지
-- 이미지 업로드 저장소
 - QR 스캐너 실기기 판독 테스트
-- `memory.loopmateapp.com` 라우팅
 - 개인정보/추모 데이터 백업 정책

@@ -96,7 +96,7 @@ cat ~/.ssh/github_actions_silver_deploy
 
 `deploy-app.sh`는 `.env.prod`를 덮어쓰지 않는다.
 
-`silver-memory-app`은 현재 별도 repository가 아니라 deploy repo에 포함되어 있으며, 자동배포 시 `~/apps/silverProject/silver-memory-app`으로 복사된다. 서비스 규모가 커지면 별도 repository로 분리하고 `deploy-app.sh`의 `pull_repo silver-memory-app` 흐름으로 바꾼다.
+`silver-memory-app`은 현재 별도 repository가 아니라 deploy repo에 포함되어 있으며, 자동배포 시 `~/apps/silverProject/silver-memory-app`으로 복사된다. 동접자와 매출이 생기기 전까지는 같은 Lightsail/Compose 안에서 모놀리식으로 운영한다.
 
 ## 수동 테스트
 

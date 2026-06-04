@@ -138,6 +138,34 @@ patch_json() {
   echo "$output"
 }
 
+delete_json() {
+  local name="$1"
+  local url="$2"
+  local expected_status="$3"
+  local body="$4"
+  local output="$TMP_DIR/${name}.body"
+  local status
+
+  : > "$output"
+  status="$(curl -sS -L \
+    -H "Content-Type: application/json" \
+    -H "X-Memory-Editor-Token: ${MEMORY_EDITOR_TOKEN:-}" \
+    -o "$output" \
+    -w "%{http_code}" \
+    -X DELETE \
+    --data "$body" \
+    "$url")"
+
+  if [ "$status" != "$expected_status" ]; then
+    echo "FAIL $name: expected HTTP $expected_status but got $status" >&2
+    echo "URL: $url" >&2
+    sed -n '1,80p' "$output" >&2
+    exit 1
+  fi
+
+  echo "$output"
+}
+
 require_command curl
 require_command grep
 
@@ -189,5 +217,35 @@ fi
 patch_body="$(patch_json memory_guestbook_hide "${API_BASE_URL}/api/memory/guestbook/${guestbook_id}" 200 "{\"status\":\"hidden\",\"editorName\":\"운영 점검\"}")"
 assert_contains "$patch_body" "\"status\":\"hidden\"" "Smoke guestbook entry should be hidden after moderation"
 echo "PASS guestbook write/moderation"
+
+life_event_body="$(post_json memory_life_event "${API_BASE_URL}/api/memory/memorials/${MEMORY_SLUG}/life-events" 201 "{\"eventYear\":\"점검\",\"title\":\"Smoke Test Timeline\",\"body\":\"운영 점검용 타임라인 ${timestamp}\",\"editorName\":\"운영 점검\"}")"
+assert_contains "$life_event_body" "\"title\":\"Smoke Test Timeline\"" "Smoke life event should be created"
+life_event_id="$(sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p' "$life_event_body" | head -n 1)"
+
+if [ -z "$life_event_id" ]; then
+  echo "FAIL: Could not find life event id in response" >&2
+  sed -n '1,80p' "$life_event_body" >&2
+  exit 1
+fi
+
+life_event_patch_body="$(patch_json memory_life_event_patch "${API_BASE_URL}/api/memory/life-events/${life_event_id}" 200 "{\"eventYear\":\"점검\",\"title\":\"Smoke Test Timeline Updated\",\"body\":\"운영 점검용 타임라인 수정 ${timestamp}\",\"editorName\":\"운영 점검\"}")"
+assert_contains "$life_event_patch_body" "\"title\":\"Smoke Test Timeline Updated\"" "Smoke life event should be updated"
+delete_json memory_life_event_delete "${API_BASE_URL}/api/memory/life-events/${life_event_id}" 204 "{\"editorName\":\"운영 점검\"}" >/dev/null
+echo "PASS life event write/update/delete"
+
+moment_body="$(post_json memory_moment "${API_BASE_URL}/api/memory/memorials/${MEMORY_SLUG}/moments" 201 "{\"title\":\"Smoke Test Moment\",\"tag\":\"운영 점검\",\"body\":\"운영 점검용 기억 카드 ${timestamp}\",\"editorName\":\"운영 점검\"}")"
+assert_contains "$moment_body" "\"title\":\"Smoke Test Moment\"" "Smoke moment should be created"
+moment_id="$(sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p' "$moment_body" | head -n 1)"
+
+if [ -z "$moment_id" ]; then
+  echo "FAIL: Could not find moment id in response" >&2
+  sed -n '1,80p' "$moment_body" >&2
+  exit 1
+fi
+
+moment_patch_body="$(patch_json memory_moment_patch "${API_BASE_URL}/api/memory/moments/${moment_id}" 200 "{\"title\":\"Smoke Test Moment Updated\",\"tag\":\"운영 점검\",\"body\":\"운영 점검용 기억 카드 수정 ${timestamp}\",\"editorName\":\"운영 점검\"}")"
+assert_contains "$moment_patch_body" "\"title\":\"Smoke Test Moment Updated\"" "Smoke moment should be updated"
+delete_json memory_moment_delete "${API_BASE_URL}/api/memory/moments/${moment_id}" 204 "{\"editorName\":\"운영 점검\"}" >/dev/null
+echo "PASS moment write/update/delete"
 
 echo "Memory smoke test complete."

@@ -29,7 +29,7 @@ scheduled collector job
 
 - frontend와 backend는 가능하면 같은 origin으로 노출한다. 그러면 CORS 문제를 피할 수 있다.
 - `/api`는 backend로 라우팅하고, 나머지는 frontend SPA로 보낸다.
-- `Silver Memory`는 우선 `/memory/` 하위 경로로 노출한다. 실제 브랜드가 굳어지면 `memory.loopmateapp.com` 같은 별도 도메인으로 분리한다.
+- `Silver Memory`는 운영 비용을 줄이기 위해 현재 같은 Lightsail/Compose 안에서 `/memory/` 하위 경로로 노출한다. 동접자와 매출이 생기기 전까지는 모놀리식 운영을 유지한다.
 - collector는 상시 서버가 아니라 scheduled job 또는 수동 batch로 둔다.
 - 인증키와 DB 비밀번호는 이미지에 넣지 않고 secret/env로만 주입한다.
 - 운영 배포 전에는 `/internal/**` API 보호가 필요하다.

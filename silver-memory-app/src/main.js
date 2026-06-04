@@ -905,6 +905,16 @@ function renderEditor() {
         </form>
       </div>
 
+      <div class="panel editor-wide">
+        <div class="section-title">
+          <p>타임라인 관리</p>
+          <h2>기록 수정과 삭제</h2>
+        </div>
+        <div class="memory-edit-list">
+          ${state.timeline.length ? state.timeline.map(renderTimelineEditorEntry).join('') : '<p class="empty-text">아직 타임라인이 없습니다.</p>'}
+        </div>
+      </div>
+
       <div class="panel">
         <div class="section-title">
           <p>${escapeHtml(memorySceneLabel())}</p>
@@ -917,6 +927,16 @@ function renderEditor() {
           <textarea name="body" rows="4" placeholder="짧은 이야기나 가족이 기억하는 장면" required></textarea>
           <button type="submit" class="secondary-button">기억 카드 추가</button>
         </form>
+      </div>
+
+      <div class="panel editor-wide">
+        <div class="section-title">
+          <p>${escapeHtml(memorySceneLabel())} 관리</p>
+          <h2>기억 카드 수정과 삭제</h2>
+        </div>
+        <div class="memory-edit-list">
+          ${state.moments.length ? state.moments.map(renderMomentEditorEntry).join('') : '<p class="empty-text">아직 기억 카드가 없습니다.</p>'}
+        </div>
       </div>
 
       <div class="panel editor-wide">
@@ -1116,6 +1136,68 @@ function renderEditorInvite(invite) {
   `
 }
 
+function renderTimelineEditorEntry(item) {
+  return `
+    <form class="memory-edit-entry" data-life-event-edit-form="${escapeHtml(item.id)}">
+      <div class="memory-edit-heading">
+        <strong>${escapeHtml(item.year)}</strong>
+        <span>${escapeHtml(item.title)}</span>
+      </div>
+      <div class="compact-grid">
+        <label>
+          연도
+          <input name="year" value="${escapeHtml(item.year)}" required />
+        </label>
+        <label>
+          제목
+          <input name="title" value="${escapeHtml(item.title)}" required />
+        </label>
+      </div>
+      <label>
+        내용
+        <textarea name="body" rows="3" required>${escapeHtml(item.body)}</textarea>
+      </label>
+      <div class="button-row">
+        <button type="submit" class="secondary-button">수정</button>
+        <button type="button" class="danger-button" data-delete-life-event="${escapeHtml(item.id)}">삭제</button>
+      </div>
+    </form>
+  `
+}
+
+function renderMomentEditorEntry(item) {
+  return `
+    <form class="memory-edit-entry" data-moment-edit-form="${escapeHtml(item.id)}">
+      <div class="memory-edit-heading">
+        <strong>${escapeHtml(item.tag || '기억')}</strong>
+        <span>${escapeHtml(item.title)}</span>
+      </div>
+      <div class="compact-grid">
+        <label>
+          제목
+          <input name="title" value="${escapeHtml(item.title)}" required />
+        </label>
+        <label>
+          분류
+          <input name="tag" value="${escapeHtml(item.tag || '')}" />
+        </label>
+      </div>
+      <label>
+        영상/사진 링크
+        <input name="mediaUrl" value="${escapeHtml(item.mediaUrl || '')}" />
+      </label>
+      <label>
+        내용
+        <textarea name="body" rows="4" required>${escapeHtml(item.body)}</textarea>
+      </label>
+      <div class="button-row">
+        <button type="submit" class="secondary-button">수정</button>
+        <button type="button" class="danger-button" data-delete-moment="${escapeHtml(item.id)}">삭제</button>
+      </div>
+    </form>
+  `
+}
+
 function renderEditHistoryEntry(event) {
   return `
     <article class="edit-history-entry">
@@ -1134,7 +1216,11 @@ function editActionLabel(actionType) {
     memorial_created: '생성',
     profile_updated: '프로필 수정',
     life_event_created: '타임라인 추가',
+    life_event_updated: '타임라인 수정',
+    life_event_deleted: '타임라인 삭제',
     moment_created: '기억 카드 추가',
+    moment_updated: '기억 카드 수정',
+    moment_deleted: '기억 카드 삭제',
     editor_invite_created: '가족 초대',
     editor_invite_revoked: '초대 회수',
     guestbook_moderated: '방명록 관리',
@@ -1197,9 +1283,21 @@ function bindGlobalEvents() {
   app.querySelector('[data-timeline-form]')?.addEventListener('submit', handleTimelineForm)
   app.querySelector('[data-moment-form]')?.addEventListener('submit', handleMomentForm)
   app.querySelector('[data-invite-form]')?.addEventListener('submit', handleInviteForm)
+  app.querySelectorAll('[data-life-event-edit-form]').forEach((form) => {
+    form.addEventListener('submit', handleTimelineEditForm)
+  })
+  app.querySelectorAll('[data-moment-edit-form]').forEach((form) => {
+    form.addEventListener('submit', handleMomentEditForm)
+  })
   app.querySelector('[data-download-qr]')?.addEventListener('click', downloadQrCard)
   app.querySelectorAll('[data-revoke-invite]').forEach((button) => {
     button.addEventListener('click', () => revokeEditorInvite(button.dataset.revokeInvite))
+  })
+  app.querySelectorAll('[data-delete-life-event]').forEach((button) => {
+    button.addEventListener('click', () => deleteLifeEvent(button.dataset.deleteLifeEvent))
+  })
+  app.querySelectorAll('[data-delete-moment]').forEach((button) => {
+    button.addEventListener('click', () => deleteMoment(button.dataset.deleteMoment))
   })
   app.querySelector('[data-generate-tags]')?.addEventListener('click', () => {
     setState((current) => {
@@ -1722,6 +1820,157 @@ async function handleMomentForm(event) {
   }))
 
   form.reset()
+}
+
+async function handleTimelineEditForm(event) {
+  event.preventDefault()
+  const form = event.currentTarget
+  const id = form.dataset.lifeEventEditForm
+  const formData = new FormData(form)
+  const item = {
+    year: formText(formData, 'year'),
+    title: formText(formData, 'title'),
+    body: formText(formData, 'body'),
+  }
+
+  if (state.isApiBacked) {
+    const ok = await runApiAction(async () => {
+      await apiRequest(`/api/memory/life-events/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          eventYear: item.year,
+          title: item.title,
+          body: item.body,
+          editorName: currentEditorName(),
+        }),
+      })
+      await loadFromApi({ includeModeration: true, activeTab: 'editor' })
+    })
+    if (!ok) return
+    return
+  }
+
+  setState((current) => ({
+    ...current,
+    timeline: current.timeline.map((eventItem) =>
+      String(eventItem.id) === String(id) ? { ...eventItem, ...item } : eventItem,
+    ),
+    editHistory: [
+      buildLocalEditEvent('life_event_updated', `'${item.title}' 타임라인을 수정했습니다.`),
+      ...current.editHistory,
+    ],
+  }))
+}
+
+async function deleteLifeEvent(id) {
+  if (!id || !window.confirm('이 타임라인 기록을 삭제할까요?')) return
+
+  const currentItem = state.timeline.find((item) => String(item.id) === String(id))
+
+  if (state.isApiBacked) {
+    const ok = await runApiAction(async () => {
+      await apiRequest(`/api/memory/life-events/${id}`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          editorName: currentEditorName(),
+        }),
+      })
+      await loadFromApi({ includeModeration: true, activeTab: 'editor' })
+    })
+    if (!ok) return
+    return
+  }
+
+  setState((current) => ({
+    ...current,
+    timeline: current.timeline.filter((item) => String(item.id) !== String(id)),
+    editHistory: [
+      buildLocalEditEvent(
+        'life_event_deleted',
+        `'${currentItem?.title ?? '타임라인'}' 타임라인을 삭제했습니다.`,
+      ),
+      ...current.editHistory,
+    ],
+  }))
+}
+
+async function handleMomentEditForm(event) {
+  event.preventDefault()
+  const form = event.currentTarget
+  const id = form.dataset.momentEditForm
+  const formData = new FormData(form)
+  const item = {
+    title: formText(formData, 'title'),
+    body: formText(formData, 'body'),
+    tag: formText(formData, 'tag') || '기억',
+    mediaUrl: safeMediaUrl(formText(formData, 'mediaUrl')),
+  }
+
+  if (state.isApiBacked) {
+    const ok = await runApiAction(async () => {
+      await apiRequest(`/api/memory/moments/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          title: item.title,
+          body: item.body,
+          tag: item.tag,
+          mediaUrl: item.mediaUrl || null,
+          editorName: currentEditorName(),
+        }),
+      })
+      await loadFromApi({ includeModeration: true, activeTab: 'editor' })
+    })
+    if (!ok) return
+    return
+  }
+
+  setState((current) => ({
+    ...current,
+    moments: current.moments.map((moment) =>
+      String(moment.id) === String(id) ? { ...moment, ...item } : moment,
+    ),
+    editHistory: [
+      buildLocalEditEvent('moment_updated', `'${item.title}' 기억 카드를 수정했습니다.`),
+      ...current.editHistory,
+    ],
+  }))
+}
+
+async function deleteMoment(id) {
+  if (!id || !window.confirm('이 기억 카드를 삭제할까요?')) return
+
+  const currentItem = state.moments.find((item) => String(item.id) === String(id))
+
+  if (state.isApiBacked) {
+    const ok = await runApiAction(async () => {
+      await apiRequest(`/api/memory/moments/${id}`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          editorName: currentEditorName(),
+        }),
+      })
+      await loadFromApi({ includeModeration: true, activeTab: 'editor' })
+    })
+    if (!ok) return
+    return
+  }
+
+  setState((current) => {
+    const nextMoments = current.moments.filter((item) => String(item.id) !== String(id))
+
+    return {
+      ...current,
+      storyIndex: Math.min(current.storyIndex, Math.max(0, nextMoments.length - 1)),
+      moments: nextMoments,
+      editHistory: [
+        buildLocalEditEvent(
+          'moment_deleted',
+          `'${currentItem?.title ?? '기억 카드'}' 기억 카드를 삭제했습니다.`,
+        ),
+        ...current.editHistory,
+      ],
+    }
+  })
 }
 
 function safeMediaUrl(value) {

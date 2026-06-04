@@ -45,4 +45,4 @@ MEMORY_EDITOR_TOKEN='유족_코드' \
 - collector: `git@github.com:dgdev22/silver-data-collector.git`
 - backend: `git@github.com:dgdev22/silver-backend.git`
 - frontend: `git@github.com:dgdev22/silver-frontend.git`
-- memory frontend: 현재 deploy repo에 포함. 서비스가 커지면 별도 repo로 분리한다.
+- memory frontend: 현재 deploy repo에 포함. 동접자와 매출이 생기기 전까지는 같은 Lightsail/Compose 안에서 모놀리식으로 운영한다.

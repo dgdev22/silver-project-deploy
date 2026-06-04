@@ -443,7 +443,8 @@ h1 {
 .guest-list,
 .moderation-list,
 .edit-history-list,
-.invite-list {
+.invite-list,
+.memory-edit-list {
   display: grid;
   gap: 12px;
 }
@@ -451,7 +452,8 @@ h1 {
 .guest-entry,
 .moderation-entry,
 .edit-history-entry,
-.invite-entry {
+.invite-entry,
+.memory-edit-entry {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-raised);
@@ -470,7 +472,8 @@ h1 {
 .guest-entry div,
 .moderation-entry div:first-child,
 .edit-history-entry div:first-child,
-.invite-entry div:first-child {
+.invite-entry div:first-child,
+.memory-edit-heading {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -480,13 +483,15 @@ h1 {
 
 .guest-entry strong,
 .moderation-entry strong,
-.edit-history-entry strong {
+.edit-history-entry strong,
+.memory-edit-heading strong {
   font-size: 1.15rem;
 }
 
 .guest-entry span,
 .moderation-entry span,
-.edit-history-entry span {
+.edit-history-entry span,
+.memory-edit-heading span {
   color: var(--muted);
   font-weight: 900;
 }
@@ -508,6 +513,17 @@ h1 {
   color: var(--ink);
   font-weight: 800;
   line-height: 1.45;
+}
+
+.memory-edit-entry {
+  display: grid;
+  gap: 14px;
+}
+
+.compact-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+  gap: 12px;
 }
 
 .qr-panel {
@@ -743,6 +759,16 @@ textarea {
   padding: 0 18px;
 }
 
+.danger-button {
+  min-height: 48px;
+  border: 2px solid #9f1239;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #9f1239;
+  padding: 0 18px;
+  font-weight: 900;
+}
+
 .form-note,
 .empty-text {
   color: var(--muted);
@@ -779,7 +805,8 @@ textarea {
   .hero-section,
   .content-grid,
   .guestbook-layout,
-  .editor-layout {
+  .editor-layout,
+  .compact-grid {
     grid-template-columns: 1fr;
   }
 
