@@ -72,6 +72,7 @@ const initialState = {
   storyIndex: 0,
   editorName: '유족',
   editorToken: '',
+  lastIssuedEditorToken: '',
   inviteLink: '',
   editorInvites: [],
   designTheme: DEFAULT_DESIGN_THEME,
@@ -205,6 +206,8 @@ function loadState() {
 }
 
 function saveState() {
+  if (isCreateRoute()) return
+
   const { isApiBacked, isLoading, apiError, ...persistedState } = state
   window.localStorage.setItem(storageKey(), JSON.stringify(persistedState))
 }
@@ -258,7 +261,13 @@ async function apiRequest(path, options = {}) {
     throw error
   }
 
-  return response.json()
+  if (response.status === 204) {
+    return null
+  }
+
+  const text = await response.text()
+
+  return text ? JSON.parse(text) : null
 }
 
 function apiUrl(path) {
@@ -420,10 +429,27 @@ function escapeHtml(value) {
 }
 
 function memoryPageUrl() {
-  const url = new URL(window.location.href)
-  const basePath = `${url.origin}${url.pathname}`
+  return memoryPageUrlForSlug(currentMemorySlug())
+}
 
-  return `${basePath}#/m/${encodeURIComponent(currentMemorySlug())}`
+function memoryPageUrlForSlug(slug) {
+  return `${memoryBaseUrl()}#/m/${encodeURIComponent(slug)}`
+}
+
+function memoryCreateUrl() {
+  return `${memoryBaseUrl()}#/new`
+}
+
+function memoryBaseUrl() {
+  const url = new URL(window.location.href)
+
+  return `${url.origin}${url.pathname}`
+}
+
+function isCreateRoute() {
+  const hasQuerySlug = Boolean(new URLSearchParams(window.location.search).get('slug'))
+
+  return window.location.hash.startsWith('#/new') || (!window.location.hash && !hasQuerySlug)
 }
 
 function currentMemorySlug() {
@@ -476,6 +502,29 @@ function currentEditorName() {
 
 function render() {
   applyDesignTheme()
+
+  if (isCreateRoute()) {
+    app.innerHTML = `
+      <header class="app-header">
+        <a class="brand" href="${escapeHtml(memoryCreateUrl())}" aria-label="Silver Memory 홈">
+          <span>Silver Memory</span>
+        </a>
+        <nav class="top-nav" aria-label="주요 메뉴">
+          ${navLink(memoryCreateUrl(), '새 추모관', true)}
+          ${navLink(memoryPageUrlForSlug(DEFAULT_MEMORY_SLUG), '샘플 보기', false)}
+        </nav>
+        <div class="storage-status is-live">운영 저장</div>
+      </header>
+
+      <main>
+        ${state.apiError ? `<p class="status-note">${escapeHtml(state.apiError)}</p>` : ''}
+        ${renderCreateMemorial()}
+      </main>
+    `
+    bindGlobalEvents()
+    return
+  }
+
   app.innerHTML = `
     <header class="app-header">
       <a class="brand" href="${escapeHtml(memoryPageUrl())}" data-tab="life" aria-label="Silver Memory 홈">
@@ -485,6 +534,7 @@ function render() {
         ${navButton('life', '생애')}
         ${navButton('guestbook', '방명록')}
         ${navButton('editor', '유족 편집')}
+        ${navLink(memoryCreateUrl(), '새 추모관', false)}
       </nav>
       <div class="storage-status ${state.isApiBacked ? 'is-live' : 'is-local'}">
         ${state.isApiBacked ? 'DB 저장 중' : '임시 저장'}
@@ -501,6 +551,18 @@ function render() {
   bindGlobalEvents()
 }
 
+function navLink(href, label, current) {
+  return `
+    <a
+      class="nav-button ${current ? 'is-active' : ''}"
+      href="${escapeHtml(href)}"
+      aria-current="${current ? 'page' : 'false'}"
+    >
+      ${escapeHtml(label)}
+    </a>
+  `
+}
+
 function navButton(tab, label) {
   const current = state.activeTab === tab
   return `
@@ -512,6 +574,69 @@ function navButton(tab, label) {
     >
       ${label}
     </button>
+  `
+}
+
+function renderCreateMemorial() {
+  return `
+    <section class="create-shell">
+      <div class="create-copy">
+        <p class="eyebrow">새 추모관</p>
+        <h1>가족의 기억을 담을 페이지를 만듭니다</h1>
+        <p>생성 후 바로 유족 편집기와 QR 카드를 사용할 수 있습니다.</p>
+      </div>
+
+      <form class="panel create-form" data-create-memorial-form>
+        <div class="section-title">
+          <p>기본 정보</p>
+          <h2>처음에 보여줄 내용을 입력하세요</h2>
+        </div>
+        <label>
+          이름
+          <input name="displayName" placeholder="예: 김영수" required />
+        </label>
+        <label>
+          생애 기간
+          <input name="years" placeholder="예: 1942 - 2026" />
+        </label>
+        <label>
+          한 줄 소개
+          <input name="subtitle" placeholder="예: 바다와 가족을 사랑한 사람" />
+        </label>
+        <label>
+          지역
+          <input name="location" placeholder="예: 강원특별자치도 강릉" />
+        </label>
+        <label>
+          키워드
+          <input name="tags" placeholder="예: 가족, 강릉 바다, 노래" />
+        </label>
+        <div class="compact-grid">
+          <label>
+            기억 대상
+            <select name="memorialKind">
+              <option value="person">사람</option>
+              <option value="pet">반려동물</option>
+            </select>
+          </label>
+          <label>
+            페이지 구성
+            <select name="pageTemplate">
+              <option value="classic">기록관형</option>
+              <option value="album">앨범형</option>
+              <option value="letter">편지형</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          분위기
+          <select name="designTheme">
+            ${DESIGN_THEMES.map((theme) => `<option value="${escapeHtml(theme.id)}">${escapeHtml(theme.label)}</option>`).join('')}
+          </select>
+        </label>
+        <button type="submit" class="primary-button">추모관 만들기</button>
+      </form>
+    </section>
   `
 }
 
@@ -807,6 +932,17 @@ function renderEditor() {
             placeholder="샘플 코드: demo-family-token"
           />
         </label>
+        ${
+          state.lastIssuedEditorToken
+            ? `
+              <div class="issued-token-box">
+                <span class="field-label">처음 발급된 유족 코드</span>
+                <input value="${escapeHtml(state.lastIssuedEditorToken)}" readonly />
+                <p>이 코드는 유족 편집과 가족 초대에 필요합니다.</p>
+              </div>
+            `
+            : ''
+        }
         <label>
           ${escapeHtml(nameFieldLabel())}
           <input name="name" value="${escapeHtml(state.profile.name)}" required />
@@ -1246,6 +1382,10 @@ function buildLocalEditEvent(actionType, summary) {
 }
 
 function bindGlobalEvents() {
+  app
+    .querySelector('[data-create-memorial-form]')
+    ?.addEventListener('submit', handleCreateMemorialForm)
+
   app.querySelectorAll('[data-tab]').forEach((element) => {
     element.addEventListener('click', () => {
       const nextTab = element.dataset.tab
@@ -1371,6 +1511,55 @@ function bindGlobalEvents() {
   app.querySelectorAll('[data-pin]').forEach((button) => {
     button.addEventListener('click', () => toggleGuestPin(button.dataset.pin))
   })
+}
+
+async function handleCreateMemorialForm(event) {
+  event.preventDefault()
+  const form = event.currentTarget
+  const formData = new FormData(form)
+  const editorName = '유족'
+
+  try {
+    const result = await apiRequest('/api/memory/memorials', {
+      method: 'POST',
+      body: JSON.stringify({
+        displayName: formText(formData, 'displayName'),
+        years: formText(formData, 'years') || null,
+        subtitle: formText(formData, 'subtitle') || null,
+        location: formText(formData, 'location') || null,
+        visibility: 'link',
+        tags: parseTags(String(formData.get('tags') ?? '')),
+        memorialKind: String(formData.get('memorialKind') ?? DEFAULT_MEMORIAL_KIND),
+        pageTemplate: String(formData.get('pageTemplate') ?? DEFAULT_PAGE_TEMPLATE),
+        designTheme: String(formData.get('designTheme') ?? DEFAULT_DESIGN_THEME),
+        editorName,
+      }),
+    })
+    const nextState = {
+      ...structuredClone(initialState),
+      ...normalizeApiMemorial(result.memorial),
+      activeTab: 'editor',
+      editorName,
+      editorToken: result.editorToken,
+      lastIssuedEditorToken: result.editorToken,
+      isApiBacked: true,
+      isLoading: false,
+      apiError: '',
+    }
+
+    window.history.pushState(null, '', memoryPageUrlForSlug(nextState.profile.slug))
+    state = nextState
+    saveState()
+    render()
+  } catch (error) {
+    setState((current) => ({
+      ...current,
+      apiError:
+        error.status === 409
+          ? '이미 사용 중인 주소입니다. 다시 시도해주세요.'
+          : '새 추모관을 만들려면 백엔드 연결이 필요합니다.',
+    }))
+  }
 }
 
 async function handleGuestForm(event) {
@@ -2548,5 +2737,41 @@ function downloadQrCard() {
   URL.revokeObjectURL(link.href)
 }
 
+function reloadCurrentRoute() {
+  state = {
+    ...loadState(),
+    isApiBacked: false,
+    isLoading: false,
+    apiError: '',
+  }
+
+  const token = inviteTokenFromUrl()
+  if (token) {
+    state = {
+      ...state,
+      activeTab: 'editor',
+      editorToken: token,
+    }
+    window.history.replaceState(null, '', memoryPageUrl())
+    saveState()
+  }
+
+  render()
+
+  if (!isCreateRoute()) {
+    loadFromApi({
+      includeModeration: state.activeTab === 'editor' && Boolean(state.editorToken),
+      activeTab: state.activeTab,
+    })
+  }
+}
+
+window.addEventListener('hashchange', reloadCurrentRoute)
+
 render()
-loadFromApi()
+if (!isCreateRoute()) {
+  loadFromApi({
+    includeModeration: state.activeTab === 'editor' && Boolean(state.editorToken),
+    activeTab: state.activeTab,
+  })
+}

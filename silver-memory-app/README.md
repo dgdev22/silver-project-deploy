@@ -5,6 +5,7 @@
 ## 현재 범위
 
 - 고인의 생애 페이지: 대표 사진, 한 줄 소개, 삶의 키워드, 타임라인, 기억 카드
+- 새 추모관 만들기: 기본 정보 입력 후 slug와 최초 유족 코드 발급
 - 방명록: 방문자 작성, 승인 대기, 공개 글 표시
 - 유족 편집기: 기본 정보 수정, 사진 업로드, 공개 범위 변경, 방명록 승인/숨김/고정
 - 타임라인 편집: 중요한 순간 추가, 수정, 삭제
@@ -51,6 +52,7 @@ cd ../backend
 
 ```http
 GET /api/memory/memorials/kim-youngsu
+POST /api/memory/memorials
 POST /api/memory/memorials/kim-youngsu/guestbook
 GET /api/memory/memorials/kim-youngsu?includeModeration=true
 PUT /api/memory/memorials/kim-youngsu
@@ -73,6 +75,8 @@ X-Memory-Editor-Token: demo-family-token
 ```
 
 가족 초대 링크는 `#/m/{slug}?invite={token}` 형식입니다. 초대 링크로 들어오면 프론트엔드가 초대 토큰을 유족 코드 입력란에 저장하고, 주소창에서는 토큰을 제거합니다. 생성된 초대는 유족 편집기에서 상태와 만료일을 확인하고 회수할 수 있습니다.
+
+새 추모관 생성 응답의 `editorToken`은 최초 유족 코드입니다. 프론트엔드는 생성 직후 이 코드를 유족 편집기에 표시하고, 해당 코드로 바로 편집 화면을 엽니다.
 
 ## 디자인 변경
 
