@@ -5,6 +5,12 @@
 {$SITE_DOMAIN} {
 	encode gzip zstd
 
+	redir /memory /memory/ 308
+
+	handle_path /memory/* {
+		reverse_proxy memory-frontend:80
+	}
+
 	handle /api/* {
 		reverse_proxy backend:8080
 	}

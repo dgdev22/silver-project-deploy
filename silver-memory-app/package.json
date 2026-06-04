@@ -1,0 +1,10 @@
+{
+  "name": "silver-memory-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "python3 -m http.server 5175 --bind 127.0.0.1",
+    "check": "node --check src/main.js"
+  }
+}

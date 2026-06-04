@@ -4,6 +4,12 @@ Last updated: 2026-05-25
 
 이 문서는 공공데이터 공모전 제출과 실제 운영 시작을 위한 AWS Lightsail 배포 절차다.
 
+2026-06-04 현재 `Silver Memory`도 같은 서버에서 함께 배포한다.
+
+- Silver Smile: `https://도메인/`
+- Silver Memory: `https://도메인/memory/`
+- Silver Memory API와 업로드 파일은 기존 backend의 `/api/memory/**`, `/uploads/memory/**`를 사용한다.
+
 ## 0. 미리 정할 것
 
 필수:
@@ -16,6 +22,7 @@ Last updated: 2026-05-25
   - `silver-data-collector`
   - `silver-backend`
   - `silver-tour-app`
+  - `silver-project-deploy` (`silver-memory-app` 정적 프론트를 포함)
 - 운영 secret:
   - `DATA_GO_KR_SERVICE_KEY`
   - `DISASTER_SAFETY_SERVICE_KEY`
@@ -115,17 +122,18 @@ repository를 clone한다.
 git clone git@github.com:dgdev22/silver-data-collector.git
 git clone git@github.com:dgdev22/silver-backend.git backend
 git clone git@github.com:dgdev22/silver-frontend.git silver-tour-app
+git clone git@github.com:dgdev22/silver-project-deploy.git deploy
 ```
 
-루트 배포 파일을 둔다.
+deploy repo의 배포 파일을 운영 루트에 둔다.
 
-```text
-compose.prod.yaml
-Caddyfile
-.env.prod
+```bash
+cp deploy/compose.prod.yaml compose.prod.yaml
+cp deploy/Caddyfile Caddyfile
+cp -R deploy/silver-memory-app silver-memory-app
 ```
 
-이 파일들은 현재 로컬 루트의 `compose.prod.yaml`, `Caddyfile`, `.env.prod.example`를 기준으로 만든다.
+`.env.prod`는 운영 루트에 직접 만들고 Git에 올리지 않는다.
 
 ## 7. 운영 환경변수 작성
 
@@ -151,7 +159,7 @@ MFDS_SERVICE_KEY=...
 
 ```bash
 docker compose --env-file .env.prod -f compose.prod.yaml build
-docker compose --env-file .env.prod -f compose.prod.yaml up -d postgres backend frontend caddy
+docker compose --env-file .env.prod -f compose.prod.yaml up -d postgres backend frontend memory-frontend caddy
 ```
 
 상태 확인:
@@ -165,6 +173,7 @@ docker compose --env-file .env.prod -f compose.prod.yaml logs -f backend
 
 ```text
 https://silver.example.com
+https://silver.example.com/memory/
 https://silver.example.com/api/health-safety-map?region=강릉&perCategoryLimit=2
 ```
 
@@ -242,6 +251,8 @@ https://silver.example.com/learning
 https://silver.example.com/tour
 https://silver.example.com/mobility
 https://silver.example.com/health
+https://silver.example.com/memory/
+https://silver.example.com/memory/#/m/kim-youngsu
 ```
 
 확인할 것:
@@ -251,6 +262,8 @@ https://silver.example.com/health
 - `정류장`, `주차장`, `저염레시피`, `건강기능식품` 레이어가 보이는가
 - 모바일 화면에서 글자와 버튼이 겹치지 않는가
 - 전화/길찾기 버튼이 보이는가
+- Memory 생애 페이지, 방명록, 유족 편집 화면이 보이는가
+- Memory 대표사진 업로드 후 `/uploads/memory/...` 이미지가 열리는가
 
 ## 12. 백업
 
@@ -304,7 +317,13 @@ git pull
 cd ~/apps/silverProject/silver-tour-app
 git pull
 
+cd ~/apps/silverProject/deploy
+git pull --ff-only
+
 cd ~/apps/silverProject
+cp deploy/compose.prod.yaml compose.prod.yaml
+cp deploy/Caddyfile Caddyfile
+cp -R deploy/silver-memory-app/. silver-memory-app/
 docker compose --env-file .env.prod -f compose.prod.yaml build
 docker compose --env-file .env.prod -f compose.prod.yaml up -d
 ```

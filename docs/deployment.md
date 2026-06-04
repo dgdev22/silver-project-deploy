@@ -13,7 +13,9 @@ Last updated: 2026-05-24
   -> HTTPS 도메인
   -> reverse proxy / platform ingress
       /      -> silver-tour-app 정적 frontend
+      /memory -> silver-memory-app 정적 frontend
       /api   -> backend
+      /uploads -> backend upload files
   -> PostgreSQL
 
 scheduled collector job
@@ -27,6 +29,7 @@ scheduled collector job
 
 - frontend와 backend는 가능하면 같은 origin으로 노출한다. 그러면 CORS 문제를 피할 수 있다.
 - `/api`는 backend로 라우팅하고, 나머지는 frontend SPA로 보낸다.
+- `Silver Memory`는 우선 `/memory/` 하위 경로로 노출한다. 실제 브랜드가 굳어지면 `memory.loopmateapp.com` 같은 별도 도메인으로 분리한다.
 - collector는 상시 서버가 아니라 scheduled job 또는 수동 batch로 둔다.
 - 인증키와 DB 비밀번호는 이미지에 넣지 않고 secret/env로만 주입한다.
 - 운영 배포 전에는 `/internal/**` API 보호가 필요하다.
@@ -78,6 +81,7 @@ scheduled collector job
 ```bash
 docker build -t silver-backend ./backend
 docker build -t silver-tour-app ./silver-tour-app
+docker build -t silver-memory-app ./silver-memory-app
 docker build -t silver-data-collector ./silver-data-collector
 ```
 
@@ -146,6 +150,12 @@ frontend 컨테이너:
 docker run --rm -p 5173:80 silver-tour-app
 ```
 
+Memory frontend 컨테이너:
+
+```bash
+docker run --rm -p 5175:80 silver-memory-app
+```
+
 collector 컨테이너는 인증키를 환경변수로 받고 `/app/data`를 볼륨으로 연결한다.
 
 ```bash
@@ -199,6 +209,8 @@ curl "http://localhost:8080/api/health-safety-map?region=강릉&perCategoryLimit
 - [ ] `/internal/**` 보호
 - [ ] 초기 processed JSON import
 - [ ] `/mobility`, `/health`, `/tour`, `/learning` 브라우저 확인
+- [ ] `/memory/`, `/memory/#/m/kim-youngsu` 브라우저 확인
+- [ ] Memory 방명록 작성, 유족 코드 편집, 대표사진 업로드 확인
 - [ ] `npm run build`, `./gradlew test`, `uv run pytest` 통과
 - [ ] 공공데이터 원천과 갱신일 표시
 - [ ] 데이터 부족/낮은 confidence 안내 문구 표시
