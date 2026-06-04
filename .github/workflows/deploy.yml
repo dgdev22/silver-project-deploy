@@ -14,6 +14,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: ${{ vars.LIGHTSAIL_DEPLOY_ENABLED != 'false' }}
+    timeout-minutes: 15
 
     steps:
       - name: Prepare SSH config

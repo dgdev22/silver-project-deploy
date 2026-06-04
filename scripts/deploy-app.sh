@@ -42,8 +42,7 @@ pull_repo silver-tour-app
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build backend frontend memory-frontend collector
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d postgres backend frontend memory-frontend caddy
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T caddy \
-  caddy reload --config /etc/caddy/Caddyfile
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" restart caddy
 
 docker image prune -f
 
