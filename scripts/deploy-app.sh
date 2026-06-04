@@ -40,7 +40,10 @@ pull_repo silver-data-collector
 pull_repo backend
 pull_repo silver-tour-app
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build backend frontend memory-frontend collector
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build backend
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build frontend
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build memory-frontend
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build collector
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d postgres backend frontend memory-frontend caddy
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" restart caddy
 
