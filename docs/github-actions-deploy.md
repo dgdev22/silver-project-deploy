@@ -116,6 +116,13 @@ cd ~/apps/silverProject/deploy
 ./scripts/refresh-data.sh
 ```
 
+Silver Memory 배포 확인:
+
+```bash
+cd ~/apps/silverProject/deploy
+./scripts/smoke-memory.sh https://silver.loopmateapp.com
+```
+
 cron 설치:
 
 ```bash

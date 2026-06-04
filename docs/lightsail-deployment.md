@@ -265,6 +265,24 @@ https://silver.example.com/memory/#/m/kim-youngsu
 - Memory 생애 페이지, 방명록, 유족 편집 화면이 보이는가
 - Memory 대표사진 업로드 후 `/uploads/memory/...` 이미지가 열리는가
 
+서버에서 Memory 읽기 전용 smoke test:
+
+```bash
+cd ~/apps/silverProject/deploy
+./scripts/smoke-memory.sh https://silver.loopmateapp.com
+```
+
+유족 코드와 방명록 moderation까지 확인하려면:
+
+```bash
+cd ~/apps/silverProject/deploy
+SILVER_MEMORY_SMOKE_WRITE=1 \
+MEMORY_EDITOR_TOKEN='유족_코드' \
+./scripts/smoke-memory.sh https://silver.loopmateapp.com
+```
+
+쓰기 점검은 점검용 방명록을 생성한 뒤 바로 `hidden`으로 바꾼다.
+
 ## 12. 백업
 
 최소 백업:

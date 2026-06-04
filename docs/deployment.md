@@ -201,6 +201,24 @@ curl "http://localhost:8080/api/health-safety-map?region=강릉&perCategoryLimit
 
 운영에서는 이 흐름을 scheduled collector job으로 바꾼다.
 
+## Silver Memory Smoke Test
+
+배포 후에는 Memory 프론트와 API 보호 상태를 한 번에 확인한다.
+
+```bash
+cd ~/apps/silverProject/deploy
+./scripts/smoke-memory.sh https://silver.loopmateapp.com
+```
+
+기본 smoke test는 읽기 전용이다. 방명록 작성과 moderation까지 확인할 때만 아래처럼 실행한다.
+
+```bash
+cd ~/apps/silverProject/deploy
+SILVER_MEMORY_SMOKE_WRITE=1 \
+MEMORY_EDITOR_TOKEN='유족_코드' \
+./scripts/smoke-memory.sh https://silver.loopmateapp.com
+```
+
 ## Public Launch Checklist
 
 - [ ] HTTPS 도메인 준비
