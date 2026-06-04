@@ -583,7 +583,7 @@ function renderCreateMemorial() {
       <div class="create-copy">
         <p class="eyebrow">새 추모관</p>
         <h1>가족의 기억을 담을 페이지를 만듭니다</h1>
-        <p>생성 후 바로 유족 편집기와 QR 카드를 사용할 수 있습니다.</p>
+        <p>생성 후 바로 유족 편집기와 QR 카드를 사용할 수 있습니다. 처음 발급되는 유족 코드는 안전한 곳에 꼭 보관해 주세요.</p>
       </div>
 
       <form class="panel create-form" data-create-memorial-form>
@@ -634,7 +634,7 @@ function renderCreateMemorial() {
             ${DESIGN_THEMES.map((theme) => `<option value="${escapeHtml(theme.id)}">${escapeHtml(theme.label)}</option>`).join('')}
           </select>
         </label>
-        <button type="submit" class="primary-button">추모관 만들기</button>
+        <button type="submit" class="primary-button" data-create-submit>추모관 만들기</button>
       </form>
     </section>
   `
@@ -935,11 +935,14 @@ function renderEditor() {
         ${
           state.lastIssuedEditorToken
             ? `
-              <div class="issued-token-box">
-                <span class="field-label">처음 발급된 유족 코드</span>
-                <input value="${escapeHtml(state.lastIssuedEditorToken)}" readonly />
-                <p>이 코드는 유족 편집과 가족 초대에 필요합니다.</p>
-              </div>
+              ${renderCopyField({
+                label: '처음 발급된 유족 코드',
+                value: state.lastIssuedEditorToken,
+                description:
+                  '이 코드는 유족 편집과 가족 초대에 필요합니다. 지금 이 브라우저에만 표시되므로 안전한 곳에 따로 보관해 주세요.',
+                buttonLabel: '코드 복사',
+                extraClass: 'issued-token-box',
+              })}
             `
             : ''
         }
@@ -1000,6 +1003,11 @@ function renderEditor() {
           })}
         </div>
         <p class="qr-url">${escapeHtml(memoryPageUrl())}</p>
+        <div class="button-row qr-actions">
+          <button type="button" class="secondary-button" data-copy-text="${escapeHtml(memoryPageUrl())}">
+            링크 복사
+          </button>
+        </div>
       </div>
 
       <div class="panel">
@@ -1015,11 +1023,13 @@ function renderEditor() {
         ${
           state.inviteLink
             ? `
-              <div class="invite-link-box">
-                <span class="field-label">초대 링크</span>
-                <input value="${escapeHtml(state.inviteLink)}" readonly />
-                <p>이 링크로 들어온 가족은 유족 편집기를 열 수 있습니다.</p>
-              </div>
+              ${renderCopyField({
+                label: '초대 링크',
+                value: state.inviteLink,
+                description: '이 링크로 들어온 가족은 유족 편집기를 열 수 있습니다.',
+                buttonLabel: '링크 복사',
+                extraClass: 'invite-link-box',
+              })}
             `
             : '<p class="form-note">초대 링크는 유족 코드가 있는 가족만 만들 수 있습니다.</p>'
         }
@@ -1095,6 +1105,21 @@ function renderEditor() {
         </div>
       </div>
     </section>
+  `
+}
+
+function renderCopyField({ label, value, description, buttonLabel = '복사', extraClass = '' }) {
+  return `
+    <div class="copy-field ${extraClass}">
+      <span class="field-label">${escapeHtml(label)}</span>
+      <div class="copy-field-row">
+        <input value="${escapeHtml(value)}" readonly aria-label="${escapeHtml(label)}" />
+        <button type="button" class="secondary-button" data-copy-text="${escapeHtml(value)}">
+          ${escapeHtml(buttonLabel)}
+        </button>
+      </div>
+      <p>${escapeHtml(description)}</p>
+    </div>
   `
 }
 
@@ -1423,6 +1448,9 @@ function bindGlobalEvents() {
   app.querySelector('[data-timeline-form]')?.addEventListener('submit', handleTimelineForm)
   app.querySelector('[data-moment-form]')?.addEventListener('submit', handleMomentForm)
   app.querySelector('[data-invite-form]')?.addEventListener('submit', handleInviteForm)
+  app.querySelectorAll('[data-copy-text]').forEach((button) => {
+    button.addEventListener('click', () => copyTextToClipboard(button.dataset.copyText ?? '', button))
+  })
   app.querySelectorAll('[data-life-event-edit-form]').forEach((form) => {
     form.addEventListener('submit', handleTimelineEditForm)
   })
@@ -1517,7 +1545,13 @@ async function handleCreateMemorialForm(event) {
   event.preventDefault()
   const form = event.currentTarget
   const formData = new FormData(form)
+  const submitButton = form.querySelector('[data-create-submit]')
   const editorName = '유족'
+
+  if (submitButton) {
+    submitButton.disabled = true
+    submitButton.textContent = '만드는 중'
+  }
 
   try {
     const result = await apiRequest('/api/memory/memorials', {
@@ -1557,9 +1591,62 @@ async function handleCreateMemorialForm(event) {
       apiError:
         error.status === 409
           ? '이미 사용 중인 주소입니다. 다시 시도해주세요.'
-          : '새 추모관을 만들려면 백엔드 연결이 필요합니다.',
+          : error.status === 429
+            ? '짧은 시간에 새 추모관을 너무 많이 만들었습니다. 잠시 후 다시 시도해주세요.'
+            : '새 추모관을 만들려면 백엔드 연결이 필요합니다.',
     }))
+  } finally {
+    if (submitButton && document.body.contains(submitButton)) {
+      submitButton.disabled = false
+      submitButton.textContent = '추모관 만들기'
+    }
   }
+}
+
+async function copyTextToClipboard(text, button) {
+  if (!text) return
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      fallbackCopyText(text)
+    }
+
+    showCopiedButtonState(button)
+  } catch {
+    window.prompt('아래 내용을 복사해 주세요.', text)
+  }
+}
+
+function fallbackCopyText(text) {
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.top = '-9999px'
+  document.body.appendChild(textarea)
+  textarea.select()
+
+  const copied = document.execCommand('copy')
+  document.body.removeChild(textarea)
+
+  if (!copied) {
+    throw new Error('Copy failed')
+  }
+}
+
+function showCopiedButtonState(button) {
+  const originalText = button.textContent
+  button.textContent = '복사됨'
+  button.disabled = true
+
+  window.setTimeout(() => {
+    if (!document.body.contains(button)) return
+
+    button.textContent = originalText
+    button.disabled = false
+  }, 1400)
 }
 
 async function handleGuestForm(event) {

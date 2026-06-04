@@ -119,6 +119,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .app-header {
   position: sticky;
   top: 0;
@@ -596,6 +601,10 @@ h1 {
   line-height: 1.45;
 }
 
+.qr-actions {
+  margin-top: 12px;
+}
+
 .guest-form,
 .editor-form,
 .timeline-form,
@@ -627,40 +636,52 @@ label {
 }
 
 .invite-link-box {
-  display: grid;
-  gap: 10px;
   margin-top: 16px;
-  border: 2px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-muted);
-  padding: 14px;
 }
 
-.issued-token-box {
+.copy-field {
   display: grid;
   gap: 10px;
-  border: 2px solid var(--highlight);
   border-radius: 8px;
-  background: var(--highlight-soft);
   padding: 14px;
 }
 
-.issued-token-box p {
-  margin: 0;
-  color: var(--ink);
-  font-weight: 900;
-  line-height: 1.45;
+.copy-field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: stretch;
 }
 
-.invite-link-box input {
-  font-size: 0.95rem;
+.copy-field-row .secondary-button {
+  min-width: 118px;
+  white-space: nowrap;
 }
 
-.invite-link-box p {
+.copy-field p {
   margin: 0;
   color: var(--muted);
   font-weight: 800;
   line-height: 1.45;
+}
+
+.issued-token-box {
+  border: 2px solid var(--highlight);
+  background: var(--highlight-soft);
+}
+
+.issued-token-box p {
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.invite-link-box {
+  border: 2px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.invite-link-box input {
+  font-size: 0.95rem;
 }
 
 .invite-list {
@@ -911,6 +932,10 @@ textarea {
   }
 
   .timeline-item {
+    grid-template-columns: 1fr;
+  }
+
+  .copy-field-row {
     grid-template-columns: 1fr;
   }
 }
