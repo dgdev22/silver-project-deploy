@@ -36,6 +36,27 @@ const DESIGN_THEMES = [
     qrDark: '#1f2933',
     swatches: ['#f5f5f2', '#1f2933', '#6e8fa3'],
   },
+  {
+    id: 'blossom',
+    label: '봄날의 꽃',
+    description: '연분홍, 잎사귀, 따뜻한 금색',
+    qrDark: '#49323b',
+    swatches: ['#fff5f7', '#7b5d68', '#d6a34f'],
+  },
+  {
+    id: 'paper',
+    label: '한지 편지',
+    description: '종이결, 먹색, 차분한 올리브',
+    qrDark: '#2f2b27',
+    swatches: ['#faf4e6', '#2f2b27', '#7a8662'],
+  },
+  {
+    id: 'lake',
+    label: '고요한 호수',
+    description: '물빛 회색, 청록, 은은한 노랑',
+    qrDark: '#17353b',
+    swatches: ['#edf7f4', '#2e7478', '#d9ba68'],
+  },
 ]
 const MEMORIAL_KINDS = [
   {
@@ -64,6 +85,16 @@ const PAGE_TEMPLATES = [
     id: 'letter',
     label: '편지형',
     description: '남겨진 마음과 글을 먼저',
+  },
+  {
+    id: 'gallery',
+    label: '사진첩형',
+    description: '기억 카드를 여러 장 펼쳐보기',
+  },
+  {
+    id: 'story',
+    label: '스토리형',
+    description: '짧은 장면을 크게 넘겨보기',
   },
 ]
 
@@ -624,9 +655,10 @@ function renderCreateMemorial() {
           <label>
             페이지 구성
             <select name="pageTemplate">
-              <option value="classic">기록관형</option>
-              <option value="album">앨범형</option>
-              <option value="letter">편지형</option>
+              ${PAGE_TEMPLATES.map(
+                (template) =>
+                  `<option value="${escapeHtml(template.id)}">${escapeHtml(template.label)}</option>`,
+              ).join('')}
             </select>
           </label>
         </div>
@@ -726,6 +758,41 @@ function renderLife() {
     `
   }
 
+  if (template === 'gallery') {
+    return `
+      ${renderMomentGalleryPanel()}
+      <section class="content-grid template-gallery">
+        ${renderTimelinePanel()}
+        <aside class="panel story-panel">
+          <div class="section-title">
+            <p>${escapeHtml(memorySceneLabel())}</p>
+            <h2>${escapeHtml(storySectionTitle())}</h2>
+          </div>
+          ${renderStoryCard()}
+        </aside>
+      </section>
+      ${renderGuestPreview()}
+    `
+  }
+
+  if (template === 'story') {
+    return `
+      <section class="story-feature">
+        <div class="panel story-panel">
+          <div class="section-title">
+            <p>${escapeHtml(memorySceneLabel())}</p>
+            <h2>${escapeHtml(storySectionTitle())}</h2>
+          </div>
+          ${renderStoryCard()}
+        </div>
+      </section>
+      <section class="content-grid template-story">
+        ${renderTimelinePanel()}
+        ${renderCompactGuestPreview()}
+      </section>
+    `
+  }
+
   return `
     <section class="content-grid">
       ${renderTimelinePanel()}
@@ -739,6 +806,56 @@ function renderLife() {
     </section>
 
     ${renderGuestPreview()}
+  `
+}
+
+function renderMomentGalleryPanel() {
+  return `
+    <section class="guest-preview moment-gallery-section">
+      <div class="section-title">
+        <p>${escapeHtml(memorySceneLabel())}</p>
+        <h2>가족이 고른 장면들</h2>
+      </div>
+      <div class="moment-gallery">
+        ${state.moments.length ? state.moments.map(renderMomentGalleryCard).join('') : '<p class="empty-text">아직 등록된 기억 카드가 없습니다.</p>'}
+      </div>
+    </section>
+  `
+}
+
+function renderMomentGalleryCard(item) {
+  const mediaUrl = safeMediaUrl(item.mediaUrl)
+
+  return `
+    <article class="moment-gallery-card">
+      <span class="chip">${escapeHtml(item.tag || '기억')}</span>
+      <h3>${escapeHtml(item.title)}</h3>
+      <p>${escapeHtml(item.body)}</p>
+      ${
+        mediaUrl
+          ? `<a class="story-media-link" href="${escapeHtml(mediaUrl)}" target="_blank" rel="noreferrer">영상/사진 링크 열기</a>`
+          : ''
+      }
+    </article>
+  `
+}
+
+function renderCompactGuestPreview() {
+  const entries = visibleGuestbookEntries().slice(0, 2)
+
+  return `
+    <aside class="panel">
+      <div class="section-title">
+        <p>방명록</p>
+        <h2>${escapeHtml(guestbookTitle())}</h2>
+      </div>
+      <div class="guest-list">
+        ${entries.length ? entries.map(renderGuestEntry).join('') : '<p class="empty-text">아직 공개된 방명록이 없습니다.</p>'}
+      </div>
+      <button type="button" class="secondary-button" data-tab="guestbook">
+        방명록 남기기
+      </button>
+    </aside>
   `
 }
 
@@ -911,6 +1028,7 @@ function renderEditor() {
   return `
     <section class="editor-layout">
       ${renderSetupChecklist()}
+      ${renderDesignEditorPanel()}
       <form class="panel editor-form" data-profile-form>
         <div class="section-title">
           <p>유족 편집기</p>
@@ -978,9 +1096,6 @@ function renderEditor() {
             ${selectOption('public', '전체 공개')}
           </select>
         </label>
-        ${renderKindPicker()}
-        ${renderTemplatePicker()}
-        ${renderThemePicker()}
         <label>
           대표 사진
           <input name="heroImage" type="file" accept="image/*" />
@@ -1108,6 +1223,33 @@ function renderEditor() {
         </div>
       </div>
     </section>
+  `
+}
+
+function renderDesignEditorPanel() {
+  return `
+    <div class="panel editor-wide design-editor-panel">
+      <div class="section-title">
+        <p>디자인 설정</p>
+        <h2>가족이 원하는 분위기로 바꾸기</h2>
+      </div>
+      <div class="design-summary">
+        <strong>${escapeHtml(currentDesignTheme().label)}</strong>
+        <span>${escapeHtml(currentPageTemplate().label)}</span>
+        <span>${escapeHtml(currentMemorialKind().label)}</span>
+      </div>
+      <div class="design-editor-grid">
+        ${renderThemePicker()}
+        ${renderTemplatePicker()}
+        ${renderKindPicker()}
+      </div>
+      <p class="form-note">선택하면 화면에 바로 미리보기로 반영됩니다. 운영 저장을 위해서는 디자인 저장을 눌러주세요.</p>
+      <div class="button-row">
+        <button type="button" class="primary-button" data-save-design>
+          디자인 저장
+        </button>
+      </div>
+    </div>
   `
 }
 
@@ -1593,6 +1735,7 @@ function bindGlobalEvents() {
       }))
     })
   })
+  app.querySelector('[data-save-design]')?.addEventListener('click', handleDesignSave)
   app.querySelector('[data-editor-name]')?.addEventListener('input', (event) => {
     state = {
       ...state,
@@ -1821,6 +1964,55 @@ async function handleProfileForm(event) {
     ],
     tagSuggestions: [],
   }))
+}
+
+async function handleDesignSave(event) {
+  const button = event.currentTarget
+  const originalText = button.textContent
+
+  button.disabled = true
+  button.textContent = '저장 중'
+
+  if (state.isApiBacked) {
+    const ok = await runApiAction(async () => {
+      await apiRequest(`/api/memory/memorials/${currentMemorySlug()}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          displayName: state.profile.name,
+          years: state.profile.years,
+          subtitle: state.profile.subtitle,
+          location: state.profile.location,
+          visibility: state.profile.visibility,
+          heroImageUrl: state.profile.heroImage,
+          tags: state.profile.tags,
+          designTheme: currentDesignTheme().id,
+          memorialKind: currentMemorialKind().id,
+          pageTemplate: currentPageTemplate().id,
+          editorName: currentEditorName(),
+        }),
+      })
+      await loadFromApi({ includeModeration: true, activeTab: 'editor' })
+    })
+
+    if (!ok && document.body.contains(button)) {
+      button.disabled = false
+      button.textContent = originalText
+    }
+    return
+  }
+
+  setState((current) => ({
+    ...current,
+    editHistory: [
+      buildLocalEditEvent('profile_updated', '페이지 디자인을 수정했습니다.'),
+      ...current.editHistory,
+    ],
+  }))
+
+  if (document.body.contains(button)) {
+    button.disabled = false
+    button.textContent = originalText
+  }
 }
 
 async function uploadMemoryImage(file) {
