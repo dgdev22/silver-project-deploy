@@ -214,6 +214,7 @@ let state = {
   isApiBacked: false,
   isLoading: false,
   apiError: '',
+  isPrivateBlocked: false,
 }
 
 const initialInviteToken = inviteTokenFromUrl()
@@ -239,7 +240,7 @@ function loadState() {
 function saveState() {
   if (isCreateRoute()) return
 
-  const { isApiBacked, isLoading, apiError, ...persistedState } = state
+  const { isApiBacked, isLoading, apiError, isPrivateBlocked, ...persistedState } = state
   window.localStorage.setItem(storageKey(), JSON.stringify(persistedState))
 }
 
@@ -332,16 +333,22 @@ async function loadFromApi({ includeModeration = false, activeTab } = {}) {
       isApiBacked: true,
       isLoading: false,
       apiError: '',
+      isPrivateBlocked: false,
     }))
   } catch (error) {
+    const privateBlocked = error.status === 403 && !includeModeration
+
     setState((current) => ({
       ...current,
       activeTab: activeTab ?? current.activeTab,
       isApiBacked: error.status === 403 ? true : false,
       isLoading: false,
+      isPrivateBlocked: privateBlocked || (current.isPrivateBlocked && error.status === 403),
       apiError:
-        error.status === 403
-          ? '유족 코드가 맞지 않아 편집 정보를 불러오지 못했습니다.'
+        privateBlocked
+          ? '가족만 볼 수 있는 비공개 추모관입니다.'
+          : error.status === 403
+            ? '유족 코드가 맞지 않아 편집 정보를 불러오지 못했습니다.'
           : '백엔드 연결 전이라 브라우저에 임시 저장합니다.',
     }))
   }
@@ -576,12 +583,42 @@ function render() {
 
     <main>
       ${state.apiError ? `<p class="status-note">${escapeHtml(state.apiError)}</p>` : ''}
-      ${renderHero()}
-      ${renderActiveTab()}
+      ${
+        state.isPrivateBlocked
+          ? renderPrivateMemorialNotice()
+          : `
+            ${renderHero()}
+            ${renderActiveTab()}
+          `
+      }
     </main>
   `
 
   bindGlobalEvents()
+}
+
+function renderPrivateMemorialNotice() {
+  return `
+    <section class="private-notice panel">
+      <div class="section-title">
+        <p>비공개 추모관</p>
+        <h1>가족만 볼 수 있는 페이지입니다</h1>
+      </div>
+      <p>이 추모관은 유족이 공개 범위를 가족만으로 설정했습니다. 유족이라면 편집 탭에서 유족 코드 또는 초대 토큰을 입력해 주세요.</p>
+      <form class="private-token-form" data-private-token-form>
+        <label>
+          유족 코드 또는 초대 토큰
+          <input name="editorToken" autocomplete="off" placeholder="유족에게 받은 코드를 입력하세요" />
+        </label>
+        <button type="submit" class="primary-button">가족 페이지 열기</button>
+      </form>
+      <div class="button-row">
+        <a class="secondary-link-button" href="${escapeHtml(memoryCreateUrl())}">
+          새 추모관 만들기
+        </a>
+      </div>
+    </section>
+  `
 }
 
 function navLink(href, label, current) {
@@ -1689,6 +1726,7 @@ function bindGlobalEvents() {
   app
     .querySelector('[data-create-memorial-form]')
     ?.addEventListener('submit', handleCreateMemorialForm)
+  app.querySelector('[data-private-token-form]')?.addEventListener('submit', handlePrivateTokenForm)
 
   app.querySelectorAll('[data-tab]').forEach((element) => {
     element.addEventListener('click', () => {
@@ -1884,6 +1922,28 @@ async function handleCreateMemorialForm(event) {
       submitButton.textContent = '추모관 만들기'
     }
   }
+}
+
+async function handlePrivateTokenForm(event) {
+  event.preventDefault()
+  const formData = new FormData(event.currentTarget)
+  const token = formText(formData, 'editorToken')
+
+  if (!token) {
+    setState((current) => ({
+      ...current,
+      apiError: '유족 코드를 입력해 주세요.',
+    }))
+    return
+  }
+
+  state = {
+    ...state,
+    activeTab: 'editor',
+    editorToken: token,
+  }
+  saveState()
+  await loadFromApi({ includeModeration: true, activeTab: 'editor' })
 }
 
 async function copyTextToClipboard(text, button) {
@@ -3270,6 +3330,7 @@ function reloadCurrentRoute() {
     isApiBacked: false,
     isLoading: false,
     apiError: '',
+    isPrivateBlocked: false,
   }
 
   const token = inviteTokenFromUrl()

@@ -227,6 +227,7 @@ button:disabled {
 .nav-button,
 .primary-button,
 .secondary-button,
+.secondary-link-button,
 .icon-button {
   min-height: 48px;
   border-radius: 8px;
@@ -1073,6 +1074,16 @@ textarea {
   padding: 0 18px;
 }
 
+.secondary-link-button {
+  display: inline-flex;
+  align-items: center;
+  border-color: var(--ink);
+  background: var(--surface-raised);
+  color: var(--ink);
+  padding: 0 18px;
+  text-decoration: none;
+}
+
 .danger-button {
   min-height: 48px;
   border: 2px solid #9f1239;
@@ -1088,6 +1099,34 @@ textarea {
   color: var(--muted);
   font-weight: 800;
   line-height: 1.5;
+}
+
+.private-notice {
+  display: grid;
+  max-width: 760px;
+  gap: 18px;
+  margin: 48px auto 0;
+}
+
+.private-notice h1 {
+  margin: 8px 0 0;
+  font-size: clamp(2.1rem, 5vw, 4rem);
+}
+
+.private-notice p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+.private-token-form {
+  display: grid;
+  gap: 14px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 16px;
 }
 
 :root[data-page-template="album"] .story-card {
