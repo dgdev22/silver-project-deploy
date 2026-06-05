@@ -7,6 +7,7 @@
 - 고인의 생애 페이지: 대표 사진, 한 줄 소개, 삶의 키워드, 타임라인, 기억 카드
 - 새 추모관 만들기: 기본 정보 입력 후 slug와 최초 유족 코드 발급
 - 최초 유족 코드/QR 링크/가족 초대 링크 복사: 생성 직후 편집 권한과 공유 링크를 안전하게 보관
+- 처음 설정 체크리스트: 유족 코드, 대표 사진, 타임라인, 기억 카드, QR, 가족 초대 준비 상태 확인
 - 방명록: 방문자 작성, 승인 대기, 공개 글 표시
 - 유족 편집기: 기본 정보 수정, 사진 업로드, 공개 범위 변경, 방명록 승인/숨김/고정
 - 타임라인 편집: 중요한 순간 추가, 수정, 삭제
@@ -84,9 +85,11 @@ X-Memory-Editor-Token: demo-family-token
 ```env
 MEMORY_CREATION_RATE_LIMIT_MAX=5
 MEMORY_CREATION_RATE_LIMIT_WINDOW_MINUTES=60
+MEMORY_GUESTBOOK_RATE_LIMIT_MAX=20
+MEMORY_GUESTBOOK_RATE_LIMIT_WINDOW_MINUTES=60
 ```
 
-`MEMORY_CREATION_RATE_LIMIT_MAX=0`으로 두면 임시로 제한을 끌 수 있습니다.
+`MEMORY_CREATION_RATE_LIMIT_MAX=0` 또는 `MEMORY_GUESTBOOK_RATE_LIMIT_MAX=0`으로 두면 해당 제한을 임시로 끌 수 있습니다.
 
 ## 디자인 변경
 

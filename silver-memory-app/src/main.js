@@ -326,7 +326,9 @@ async function runApiAction(action) {
       apiError:
         error.status === 403
           ? '유족 코드가 맞지 않습니다. 코드를 확인해주세요.'
-          : '저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+          : error.status === 429
+            ? '짧은 시간에 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.'
+            : '저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
     }))
     return false
   }
@@ -908,6 +910,7 @@ function renderGuestEntry(entry) {
 function renderEditor() {
   return `
     <section class="editor-layout">
+      ${renderSetupChecklist()}
       <form class="panel editor-form" data-profile-form>
         <div class="section-title">
           <p>유족 편집기</p>
@@ -1106,6 +1109,81 @@ function renderEditor() {
       </div>
     </section>
   `
+}
+
+function renderSetupChecklist() {
+  const steps = setupChecklist()
+  const completedCount = steps.filter((step) => step.done).length
+
+  return `
+    <div class="panel editor-wide setup-checklist-panel">
+      <div class="section-title">
+        <p>처음 설정</p>
+        <h2>${completedCount} / ${steps.length} 준비됨</h2>
+      </div>
+      <div class="setup-progress" aria-label="처음 설정 진행률">
+        <span style="width: ${(completedCount / steps.length) * 100}%"></span>
+      </div>
+      <div class="setup-step-list">
+        ${steps
+          .map(
+            (step) => `
+              <article class="setup-step ${step.done ? 'is-done' : ''}">
+                <strong>${step.done ? '완료' : '대기'}</strong>
+                <div>
+                  <h3>${escapeHtml(step.title)}</h3>
+                  <p>${escapeHtml(step.description)}</p>
+                </div>
+              </article>
+            `,
+          )
+          .join('')}
+      </div>
+      <div class="button-row setup-actions">
+        <button type="button" class="secondary-button" data-copy-text="${escapeHtml(memoryPageUrl())}">
+          추모관 링크 복사
+        </button>
+        <button type="button" class="secondary-button" data-download-qr>
+          QR 카드 다운로드
+        </button>
+      </div>
+    </div>
+  `
+}
+
+function setupChecklist() {
+  return [
+    {
+      title: '유족 코드 확인',
+      description: '편집 권한을 잃지 않도록 유족 코드를 안전한 곳에 보관합니다.',
+      done: Boolean(state.editorToken || state.lastIssuedEditorToken),
+    },
+    {
+      title: '대표 사진 등록',
+      description: '첫 화면에 보여줄 사진을 한 장 올리면 추모관의 인상이 살아납니다.',
+      done: Boolean(state.profile.heroImage),
+    },
+    {
+      title: '생애 타임라인 3개 이상',
+      description: '태어난 곳, 중요한 일, 가족이 기억하는 시간을 차례로 남깁니다.',
+      done: state.timeline.length >= 3,
+    },
+    {
+      title: `${memorySceneLabel()} 2개 이상`,
+      description: '좋아했던 것, 자주 하던 말, 가족이 간직한 장면을 짧게 적습니다.',
+      done: state.moments.length >= 2,
+    },
+    {
+      title: '방문자 링크와 QR 준비',
+      description: '묘비, 추모 앨범, 문자 메시지에 넣을 링크와 QR 카드를 준비합니다.',
+      done: Boolean(state.profile.slug),
+    },
+    {
+      title: '가족 초대',
+      description: '함께 관리할 가족에게 편집 링크를 보내 기록을 나눠 맡습니다.',
+      done: state.editorInvites.some((invite) => invite.status === 'active'),
+    },
+  ]
 }
 
 function renderCopyField({ label, value, description, buttonLabel = '복사', extraClass = '' }) {
@@ -1457,7 +1535,9 @@ function bindGlobalEvents() {
   app.querySelectorAll('[data-moment-edit-form]').forEach((form) => {
     form.addEventListener('submit', handleMomentEditForm)
   })
-  app.querySelector('[data-download-qr]')?.addEventListener('click', downloadQrCard)
+  app.querySelectorAll('[data-download-qr]').forEach((button) => {
+    button.addEventListener('click', downloadQrCard)
+  })
   app.querySelectorAll('[data-revoke-invite]').forEach((button) => {
     button.addEventListener('click', () => revokeEditorInvite(button.dataset.revokeInvite))
   })

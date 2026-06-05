@@ -490,7 +490,8 @@ h1 {
 .moderation-list,
 .edit-history-list,
 .invite-list,
-.memory-edit-list {
+.memory-edit-list,
+.setup-step-list {
   display: grid;
   gap: 12px;
 }
@@ -499,7 +500,8 @@ h1 {
 .moderation-entry,
 .edit-history-entry,
 .invite-entry,
-.memory-edit-entry {
+.memory-edit-entry,
+.setup-step {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-raised);
@@ -564,6 +566,69 @@ h1 {
 .memory-edit-entry {
   display: grid;
   gap: 14px;
+}
+
+.setup-checklist-panel {
+  background: linear-gradient(135deg, var(--surface), var(--surface-muted));
+}
+
+.setup-progress {
+  height: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-raised);
+}
+
+.setup-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-strong);
+}
+
+.setup-step-list {
+  margin-top: 16px;
+}
+
+.setup-step {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.setup-step > strong {
+  display: inline-grid;
+  min-height: 36px;
+  place-items: center;
+  border: 2px solid var(--input-border);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.setup-step.is-done > strong {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: var(--accent-contrast);
+}
+
+.setup-step h3 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+}
+
+.setup-step p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.setup-actions {
+  margin-top: 16px;
 }
 
 .compact-grid {
@@ -932,6 +997,10 @@ textarea {
   }
 
   .timeline-item {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-step {
     grid-template-columns: 1fr;
   }
 
