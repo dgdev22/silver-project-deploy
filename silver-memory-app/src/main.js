@@ -105,6 +105,7 @@ const initialState = {
   editorToken: '',
   currentEditorLabel: '',
   lastIssuedEditorToken: '',
+  lastBackupDownloadedAt: '',
   inviteLink: '',
   editorInvites: [],
   designTheme: DEFAULT_DESIGN_THEME,
@@ -1193,6 +1194,8 @@ function renderEditor() {
         </div>
       </div>
 
+      ${renderBackupPanel()}
+
       <div class="panel">
         <div class="section-title">
           <p>가족 초대</p>
@@ -1288,6 +1291,30 @@ function renderEditor() {
         </div>
       </div>
     </section>
+  `
+}
+
+function renderBackupPanel() {
+  return `
+    <div class="panel backup-panel">
+      <div class="section-title">
+        <p>가족 백업</p>
+        <h2>추모관 데이터 내려받기</h2>
+      </div>
+      <p class="form-note">
+        생애 정보, 타임라인, 기억 카드, 방명록, 편집 기록을 JSON 파일로 저장합니다. 유족 코드와 초대 토큰 원문은 보안상 백업 파일에 넣지 않습니다.
+      </p>
+      ${
+        state.lastBackupDownloadedAt
+          ? `<p class="form-note">마지막 백업: ${escapeHtml(state.lastBackupDownloadedAt)}</p>`
+          : ''
+      }
+      <div class="button-row">
+        <button type="button" class="secondary-button" data-download-backup>
+          백업 파일 다운로드
+        </button>
+      </div>
+    </div>
   `
 }
 
@@ -1410,6 +1437,9 @@ function renderSetupChecklist() {
         <button type="button" class="secondary-button" data-download-qr>
           QR 카드 다운로드
         </button>
+        <button type="button" class="secondary-button" data-download-backup>
+          백업 다운로드
+        </button>
       </div>
     </div>
   `
@@ -1446,6 +1476,11 @@ function setupChecklist() {
       title: '가족 초대',
       description: '함께 관리할 가족에게 편집 링크를 보내 기록을 나눠 맡습니다.',
       done: state.editorInvites.some((invite) => invite.status === 'active'),
+    },
+    {
+      title: '백업 파일 저장',
+      description: '생애 기록과 방명록을 가족이 보관할 수 있는 파일로 내려받습니다.',
+      done: Boolean(state.lastBackupDownloadedAt),
     },
   ]
 }
@@ -1819,6 +1854,9 @@ function bindGlobalEvents() {
   })
   app.querySelectorAll('[data-download-qr]').forEach((button) => {
     button.addEventListener('click', downloadQrCard)
+  })
+  app.querySelectorAll('[data-download-backup]').forEach((button) => {
+    button.addEventListener('click', downloadMemoryBackup)
   })
   app.querySelectorAll('[data-revoke-invite]').forEach((button) => {
     button.addEventListener('click', () => revokeEditorInvite(button.dataset.revokeInvite))
@@ -3321,6 +3359,73 @@ function calculateQrBalancePenalty(matrix) {
   const percent = (dark * 100) / total
 
   return Math.floor(Math.abs(percent - 50) / 5) * 10
+}
+
+function downloadMemoryBackup() {
+  const exportedAt = new Date()
+  const backup = {
+    schema: 'silver-memory-backup.v1',
+    exportedAt: exportedAt.toISOString(),
+    source: state.isApiBacked ? 'api' : 'browser-local',
+    memorialUrl: memoryPageUrl(),
+    profile: {
+      slug: state.profile.slug,
+      name: state.profile.name,
+      years: state.profile.years,
+      subtitle: state.profile.subtitle,
+      location: state.profile.location,
+      visibility: state.profile.visibility,
+      heroImage: state.profile.heroImage,
+      tags: state.profile.tags,
+      designTheme: state.designTheme,
+      memorialKind: state.memorialKind,
+      pageTemplate: state.pageTemplate,
+    },
+    timeline: state.timeline,
+    moments: state.moments,
+    guestbook: state.guestbook,
+    editorInvites: state.editorInvites.map((invite) => ({
+      id: invite.id,
+      inviteeLabel: invite.inviteeLabel,
+      status: invite.status,
+      expiresAt: invite.expiresAt,
+      lastUsedAt: invite.lastUsedAt,
+      createdAt: invite.createdAt,
+    })),
+    editHistory: state.editHistory,
+    securityNote:
+      '유족 코드와 초대 토큰 원문은 보안상 이 백업 파일에 포함하지 않습니다.',
+  }
+  const blob = new Blob([`${JSON.stringify(backup, null, 2)}\n`], {
+    type: 'application/json',
+  })
+  const link = document.createElement('a')
+  const datePart = exportedAt.toISOString().slice(0, 10)
+
+  link.href = URL.createObjectURL(blob)
+  link.download = `silver-memory-backup-${safeFilenamePart(state.profile.slug || state.profile.name)}-${datePart}.json`
+  link.click()
+  URL.revokeObjectURL(link.href)
+
+  setState((current) => ({
+    ...current,
+    lastBackupDownloadedAt: exportedAt.toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+  }))
+}
+
+function safeFilenamePart(value) {
+  return String(value || 'memorial')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'memorial'
 }
 
 function downloadQrCard() {

@@ -921,6 +921,10 @@ label {
   font-size: 0.95rem;
 }
 
+.backup-panel {
+  border-color: var(--accent);
+}
+
 .access-note {
   border-left: 4px solid var(--accent);
   padding-left: 0.8rem;
