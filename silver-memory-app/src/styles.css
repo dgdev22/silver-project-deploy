@@ -921,6 +921,15 @@ label {
   font-size: 0.95rem;
 }
 
+.access-note {
+  border-left: 4px solid var(--accent);
+  padding-left: 0.8rem;
+}
+
+.access-note strong {
+  color: var(--ink);
+}
+
 .invite-list {
   margin-top: 16px;
 }

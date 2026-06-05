@@ -103,6 +103,7 @@ const initialState = {
   storyIndex: 0,
   editorName: '유족',
   editorToken: '',
+  currentEditorLabel: '',
   lastIssuedEditorToken: '',
   inviteLink: '',
   editorInvites: [],
@@ -240,7 +241,14 @@ function loadState() {
 function saveState() {
   if (isCreateRoute()) return
 
-  const { isApiBacked, isLoading, apiError, isPrivateBlocked, ...persistedState } = state
+  const {
+    isApiBacked,
+    isLoading,
+    apiError,
+    isPrivateBlocked,
+    currentEditorLabel,
+    ...persistedState
+  } = state
   window.localStorage.setItem(storageKey(), JSON.stringify(persistedState))
 }
 
@@ -326,15 +334,19 @@ async function loadFromApi({ includeModeration = false, activeTab } = {}) {
       `/api/memory/memorials/${currentMemorySlug()}?includeModeration=${includeModeration}`,
     )
 
-    setState((current) => ({
-      ...current,
-      ...normalizeApiMemorial(data),
-      activeTab: activeTab ?? current.activeTab,
-      isApiBacked: true,
-      isLoading: false,
-      apiError: '',
-      isPrivateBlocked: false,
-    }))
+    setState((current) => {
+      const normalized = normalizeApiMemorial(data, current)
+
+      return {
+        ...current,
+        ...normalized,
+        activeTab: activeTab ?? current.activeTab,
+        isApiBacked: true,
+        isLoading: false,
+        apiError: '',
+        isPrivateBlocked: false,
+      }
+    })
   } catch (error) {
     const privateBlocked = error.status === 403 && !includeModeration
 
@@ -372,13 +384,18 @@ async function runApiAction(action) {
   }
 }
 
-function normalizeApiMemorial(data) {
+function normalizeApiMemorial(data, current = state) {
   const { profile, timeline, moments, guestbook, editorInvites, editHistory } = data
+  const currentEditorLabel = data.currentEditorLabel ?? ''
 
   return {
     designTheme: profile.designTheme ?? DEFAULT_DESIGN_THEME,
     memorialKind: profile.memorialKind ?? DEFAULT_MEMORIAL_KIND,
     pageTemplate: profile.pageTemplate ?? DEFAULT_PAGE_TEMPLATE,
+    currentEditorLabel,
+    editorName: shouldUseCurrentEditorLabel(current.editorName, currentEditorLabel)
+      ? currentEditorLabel
+      : current.editorName,
     tagSuggestions: [],
     profile: {
       id: profile.id,
@@ -431,6 +448,14 @@ function normalizeApiMemorial(data) {
       createdAt: formatDateTime(event.createdAt),
     })),
   }
+}
+
+function shouldUseCurrentEditorLabel(editorName, currentEditorLabel) {
+  if (!currentEditorLabel) return false
+
+  const normalizedName = String(editorName ?? '').trim()
+
+  return !normalizedName || normalizedName === '유족'
 }
 
 function formatDate(value) {
@@ -1090,6 +1115,7 @@ function renderEditor() {
             placeholder="샘플 코드: demo-family-token"
           />
         </label>
+        ${renderEditorAccessNote()}
         ${
           state.lastIssuedEditorToken
             ? `
@@ -1183,7 +1209,7 @@ function renderEditor() {
               ${renderCopyField({
                 label: '초대 링크',
                 value: state.inviteLink,
-                description: '이 링크로 들어온 가족은 유족 편집기를 열 수 있습니다.',
+                description: '이 링크로 들어온 가족은 초대받은 이름으로 편집 기록에 남습니다.',
                 buttonLabel: '링크 복사',
                 extraClass: 'invite-link-box',
               })}
@@ -1585,6 +1611,22 @@ function renderModerationEntry(entry) {
       </div>
     </article>
   `
+}
+
+function renderEditorAccessNote() {
+  if (state.currentEditorLabel) {
+    return `
+      <p class="form-note access-note">
+        현재 <strong>${escapeHtml(state.currentEditorLabel)}</strong> 권한으로 편집 중입니다. 저장한 변경은 이 이름으로 편집 기록에 남습니다.
+      </p>
+    `
+  }
+
+  if (state.editorToken && state.isApiBacked) {
+    return '<p class="form-note access-note">유족 코드가 확인되면 편집, 초대, 방명록 관리가 가능합니다.</p>'
+  }
+
+  return ''
 }
 
 function renderEditorInvite(invite) {
