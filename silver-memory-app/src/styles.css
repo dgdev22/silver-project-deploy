@@ -769,6 +769,39 @@ h1 {
   gap: 18px;
 }
 
+.quick-record-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.quick-record-form {
+  display: grid;
+  gap: 16px;
+}
+
+.quick-record-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.quick-record-grid fieldset {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+  margin: 0;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 16px;
+}
+
+.quick-record-grid legend {
+  padding: 0 8px;
+  color: var(--accent-strong);
+  font-weight: 900;
+}
+
 .compact-grid {
   display: grid;
   grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
@@ -1143,6 +1176,10 @@ textarea {
   }
 
   .moment-gallery {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-record-grid {
     grid-template-columns: 1fr;
   }
 

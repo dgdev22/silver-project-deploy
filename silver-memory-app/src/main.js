@@ -1108,6 +1108,8 @@ function renderEditor() {
         </div>
       </form>
 
+      ${renderQuickRecordPanel()}
+
       <div class="panel qr-panel">
         <div class="section-title">
           <p>묘비 QR</p>
@@ -1223,6 +1225,63 @@ function renderEditor() {
         </div>
       </div>
     </section>
+  `
+}
+
+function renderQuickRecordPanel() {
+  return `
+    <div class="panel editor-wide quick-record-panel">
+      <div class="section-title">
+        <p>빠른 기록 작성</p>
+        <h2>중요한 순간과 기억 카드를 한 번에 추가</h2>
+      </div>
+      <form class="quick-record-form" data-quick-record-form>
+        <div class="quick-record-grid">
+          <fieldset>
+            <legend>생애 타임라인</legend>
+            <div class="compact-grid">
+              <label>
+                연도
+                <input name="quickLifeYear" placeholder="예: 1981" />
+              </label>
+              <label>
+                제목
+                <input name="quickLifeTitle" placeholder="예: 가족과 함께한 집" />
+              </label>
+            </div>
+            <label>
+              내용
+              <textarea name="quickLifeBody" rows="4" placeholder="그 순간을 가족이 기억하는 방식으로 적어주세요."></textarea>
+            </label>
+          </fieldset>
+          <fieldset>
+            <legend>${escapeHtml(memorySceneLabel())}</legend>
+            <div class="compact-grid">
+              <label>
+                제목
+                <input name="quickMomentTitle" placeholder="예: 손주에게 남긴 말" />
+              </label>
+              <label>
+                분류
+                <input name="quickMomentTag" placeholder="예: 가족의 말" />
+              </label>
+            </div>
+            <label>
+              영상/사진 링크
+              <input name="quickMomentMediaUrl" placeholder="선택 입력" />
+            </label>
+            <label>
+              내용
+              <textarea name="quickMomentBody" rows="4" placeholder="짧은 이야기, 좋아했던 것, 남기고 싶은 말을 적어주세요."></textarea>
+            </label>
+          </fieldset>
+        </div>
+        <p class="form-note">타임라인 또는 기억 카드 중 하나만 채워도 추가할 수 있습니다. 제목과 내용은 함께 입력해 주세요.</p>
+        <button type="submit" class="primary-button" data-quick-record-submit>
+          기록 추가
+        </button>
+      </form>
+    </div>
   `
 }
 
@@ -1665,6 +1724,7 @@ function bindGlobalEvents() {
 
   app.querySelector('[data-guest-form]')?.addEventListener('submit', handleGuestForm)
   app.querySelector('[data-profile-form]')?.addEventListener('submit', handleProfileForm)
+  app.querySelector('[data-quick-record-form]')?.addEventListener('submit', handleQuickRecordForm)
   app.querySelector('[data-timeline-form]')?.addEventListener('submit', handleTimelineForm)
   app.querySelector('[data-moment-form]')?.addEventListener('submit', handleMomentForm)
   app.querySelector('[data-invite-form]')?.addEventListener('submit', handleInviteForm)
@@ -2012,6 +2072,114 @@ async function handleDesignSave(event) {
   if (document.body.contains(button)) {
     button.disabled = false
     button.textContent = originalText
+  }
+}
+
+async function handleQuickRecordForm(event) {
+  event.preventDefault()
+  const form = event.currentTarget
+  const formData = new FormData(form)
+  const submitButton = form.querySelector('[data-quick-record-submit]')
+  const lifeDraft = {
+    id: `t${Date.now()}`,
+    year: formText(formData, 'quickLifeYear') || '기억',
+    title: formText(formData, 'quickLifeTitle'),
+    body: formText(formData, 'quickLifeBody'),
+  }
+  const momentDraft = {
+    id: `m${Date.now()}`,
+    title: formText(formData, 'quickMomentTitle'),
+    body: formText(formData, 'quickMomentBody'),
+    tag: formText(formData, 'quickMomentTag') || '기억',
+    mediaUrl: safeMediaUrl(formText(formData, 'quickMomentMediaUrl')),
+  }
+  const wantsLifeEvent = Boolean(lifeDraft.title || lifeDraft.body)
+  const wantsMoment = Boolean(momentDraft.title || momentDraft.body || momentDraft.mediaUrl)
+  const canCreateLifeEvent = Boolean(lifeDraft.title && lifeDraft.body)
+  const canCreateMoment = Boolean(momentDraft.title && momentDraft.body)
+
+  if ((!wantsLifeEvent && !wantsMoment) || (wantsLifeEvent && !canCreateLifeEvent) || (wantsMoment && !canCreateMoment)) {
+    setState((current) => ({
+      ...current,
+      apiError: '빠른 기록은 제목과 내용을 함께 입력해야 추가할 수 있습니다.',
+    }))
+    return
+  }
+
+  if (submitButton) {
+    submitButton.disabled = true
+    submitButton.textContent = '추가 중'
+  }
+
+  if (state.isApiBacked) {
+    const ok = await runApiAction(async () => {
+      if (canCreateLifeEvent) {
+        await apiRequest(`/api/memory/memorials/${currentMemorySlug()}/life-events`, {
+          method: 'POST',
+          body: JSON.stringify({
+            eventYear: lifeDraft.year,
+            title: lifeDraft.title,
+            body: lifeDraft.body,
+            editorName: currentEditorName(),
+          }),
+        })
+      }
+
+      if (canCreateMoment) {
+        await apiRequest(`/api/memory/memorials/${currentMemorySlug()}/moments`, {
+          method: 'POST',
+          body: JSON.stringify({
+            title: momentDraft.title,
+            body: momentDraft.body,
+            tag: momentDraft.tag,
+            mediaUrl: momentDraft.mediaUrl || null,
+            editorName: currentEditorName(),
+          }),
+        })
+      }
+
+      await loadFromApi({ includeModeration: true, activeTab: 'editor' })
+    })
+
+    if (ok) {
+      form.reset()
+    } else if (submitButton && document.body.contains(submitButton)) {
+      submitButton.disabled = false
+      submitButton.textContent = '기록 추가'
+    }
+    return
+  }
+
+  setState((current) => {
+    const editHistory = []
+
+    if (canCreateLifeEvent) {
+      editHistory.push(
+        buildLocalEditEvent('life_event_created', `'${lifeDraft.title}' 타임라인을 추가했습니다.`),
+      )
+    }
+
+    if (canCreateMoment) {
+      editHistory.push(
+        buildLocalEditEvent('moment_created', `'${momentDraft.title}' 기억 카드를 추가했습니다.`),
+      )
+    }
+
+    return {
+      ...current,
+      apiError: '',
+      storyIndex: canCreateMoment ? current.moments.length : current.storyIndex,
+      timeline: canCreateLifeEvent ? [...current.timeline, lifeDraft] : current.timeline,
+      moments: canCreateMoment ? [...current.moments, momentDraft] : current.moments,
+      editHistory: [...editHistory, ...current.editHistory],
+    }
+  })
+
+  form.reset()
+
+  if (submitButton && document.body.contains(submitButton)) {
+    submitButton.disabled = false
+    submitButton.textContent = '기록 추가'
   }
 }
 
