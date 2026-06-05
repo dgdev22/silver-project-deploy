@@ -50,4 +50,4 @@ jobs:
         run: |
           ssh -i ~/.ssh/lightsail_key \
             "$SSH_TARGET" \
-            'bash -lc "cd ~/apps/silverProject/deploy && git pull --ff-only && chmod +x scripts/*.sh && ./scripts/deploy-app.sh"'
+            'flock -w 900 /tmp/silver-lightsail-deploy.lock bash -lc "cd ~/apps/silverProject/deploy && git pull --ff-only && chmod +x scripts/*.sh && ./scripts/deploy-app.sh"'
