@@ -17,8 +17,9 @@
 - 기억 카드 편집: 짧은 가족 이야기, 좋아했던 것, 영상/사진 링크 추가, 수정, 삭제
 - 유족 코드: 편집/승인/편집기록 조회 전용 MVP 보호 장치
 - 가족 초대 링크: 함께 편집할 가족에게 만료 기간이 있는 초대 링크 발급, 목록 확인, 회수, 초대받은 이름으로 편집 기록 표시
+- 가족 권한 관리: Google 계정으로 가족을 등록하고 `owner`, `editor`, `viewer` 역할 관리
 - 편집 기록: 누가 어떤 내용을 바꿨는지 유족끼리 확인
-- 가족 백업: 생애 정보, 타임라인, 기억 카드, 공지사항, 방명록, 편집 기록을 JSON 파일로 다운로드하고 브라우저에서 임시 복구
+- 가족 백업: 생애 정보, 타임라인, 기억 카드, 공지사항, 방명록, 가족 권한, 편집 기록을 JSON 파일로 다운로드하고 브라우저에서 임시 복구
 - QR 카드: 현재 페이지 URL을 실제 QR SVG로 만들고 인쇄용 안내 카드 다운로드
 - 디자인 설정: 유족이 테마, 기억 대상, 페이지 구성을 직접 선택하고 저장
 - 디자인 테마: 따뜻한 기록, 강릉 바다, 조용한 정원, 담백한 기록관, 봄날의 꽃, 한지 편지, 고요한 호수
@@ -77,6 +78,8 @@ DELETE /api/memory/announcements/{id}
 POST /api/memory/memorials/kim-youngsu/uploads
 POST /api/memory/memorials/kim-youngsu/editor-invites
 PATCH /api/memory/editor-invites/{id}
+POST /api/memory/memorials/kim-youngsu/family-members
+PATCH /api/memory/family-members/{id}
 PATCH /api/memory/guestbook/{id}/owner
 DELETE /api/memory/guestbook/{id}/owner
 PATCH /api/memory/guestbook/{id}
@@ -98,7 +101,9 @@ X-Memory-Editor-Token: demo-family-token
 
 Google 로그인이 완료되었다고 가정하면 프론트엔드는 API 요청에 `X-Memory-User-Id`, `X-Memory-User-Email`을 붙입니다. 현재 버튼은 실제 OAuth 팝업 대신 데모 사용자 정보를 설정하는 연결 지점입니다. 운영에서는 Google 로그인 성공 콜백에서 같은 `memoryUser` 상태를 채우면 됩니다. 로그인 사용자가 남긴 방명록은 서버의 `author_user_id`와 매칭되어 새로고침 후에도 `내가 남긴 방명록`에서 수정/삭제할 수 있습니다.
 
-백업 다운로드 파일에는 유족 코드와 초대 토큰 원문을 포함하지 않습니다. 권한 코드는 별도 보관해야 합니다. 백업에는 공지사항도 포함합니다. 백업 가져오기는 먼저 JSON 형식을 확인하고, 현재 단계에서는 운영 DB를 덮어쓰지 않고 이 브라우저에 임시 복구합니다.
+유족 편집기의 `가족 권한` 패널에서는 현재 Google 계정을 memorial 가족으로 등록할 수 있습니다. `owner`와 `editor`는 유족 편집기를 열 수 있고, `viewer`는 가족만 공개 추모관 열람 권한만 갖습니다. 가족 권한 관리는 최초 유족 코드/초대 토큰 또는 `owner` 가족 계정만 수행합니다.
+
+백업 다운로드 파일에는 유족 코드와 초대 토큰 원문을 포함하지 않습니다. 권한 코드는 별도 보관해야 합니다. 백업에는 공지사항과 가족 권한 요약도 포함합니다. 백업 가져오기는 먼저 JSON 형식을 확인하고, 현재 단계에서는 운영 DB를 덮어쓰지 않고 이 브라우저에 임시 복구합니다.
 
 운영 서버의 새 추모관 생성 API는 기본적으로 같은 IP에서 1시간에 5개까지만 허용합니다.
 
@@ -125,11 +130,11 @@ MEMORY_GUESTBOOK_RATE_LIMIT_WINDOW_MINUTES=60
 
 ## 로그인 방향
 
-현재 MVP는 유족 코드로 편집을 보호합니다. 운영 베타부터는 Google 로그인과 가족 초대 링크를 붙이는 것이 좋습니다.
+현재 MVP는 유족 코드와 memorial별 가족 권한으로 편집을 보호합니다. 운영 베타에서는 데모 Google 버튼을 실제 OAuth 흐름으로 교체합니다.
 
 - 공개 페이지와 방명록 작성은 로그인 없이 유지
 - 방명록 작성자 수정/삭제는 Google 사용자 ID를 우선 사용하고, 비로그인 작성자는 `ownerToken`으로 보호
-- 유족 편집기, 방명록 승인, 편집 기록, QR 다운로드는 로그인 필요
+- 유족 편집기, 방명록 승인, 편집 기록, QR 다운로드는 등록된 가족 권한 또는 유족 코드 필요
 - 유족 데이터 백업과 복구는 로그인한 가족 권한으로 제한
 - Google 로그인 사용자는 memorial별 가족 권한 테이블로 연결
 
@@ -144,7 +149,7 @@ MEMORY_GUESTBOOK_RATE_LIMIT_WINDOW_MINUTES=60
 
 ## 운영 전 필수 작업
 
-- 유족 편집기 MVP 코드를 실제 로그인/초대 토큰으로 교체
+- 데모 Google 로그인 버튼을 실제 OAuth/Spring Security 연동으로 교체
 - 방명록 스팸 방지
 - QR 스캐너 실기기 판독 테스트
 - 개인정보/추모 데이터 백업 정책

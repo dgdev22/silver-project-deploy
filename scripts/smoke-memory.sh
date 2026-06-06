@@ -182,6 +182,7 @@ echo "PASS frontend"
 public_body="$(curl_body memory_public "${API_BASE_URL}/api/memory/memorials/${MEMORY_SLUG}" 200)"
 assert_contains "$public_body" "\"profile\"" "Public memory API should include profile"
 assert_contains "$public_body" "\"announcements\"" "Public memory API should include announcements"
+assert_contains "$public_body" "\"familyMembers\"" "Public memory API should include familyMembers"
 assert_contains "$public_body" "\"guestbook\"" "Public memory API should include guestbook"
 echo "PASS public API"
 

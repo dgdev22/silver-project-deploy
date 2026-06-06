@@ -757,6 +757,7 @@ h1 {
 .moderation-list,
 .edit-history-list,
 .invite-list,
+.family-member-list,
 .memory-edit-list,
 .announcement-edit-list,
 .setup-step-list {
@@ -769,6 +770,7 @@ h1 {
 .moderation-entry,
 .edit-history-entry,
 .invite-entry,
+.family-member-entry,
 .memory-edit-entry,
 .announcement-edit-entry,
 .setup-step {
@@ -778,7 +780,8 @@ h1 {
   padding: 16px;
 }
 
-.invite-entry.is-muted {
+.invite-entry.is-muted,
+.family-member-entry.is-muted {
   opacity: 0.68;
 }
 
@@ -828,6 +831,7 @@ h1 {
 .moderation-entry div:first-child,
 .edit-history-entry div:first-child,
 .invite-entry div:first-child,
+.family-member-entry div:first-child,
 .memory-edit-heading {
   display: flex;
   flex-wrap: wrap;
@@ -839,6 +843,7 @@ h1 {
 .guest-entry strong,
 .moderation-entry strong,
 .edit-history-entry strong,
+.family-member-entry strong,
 .memory-edit-heading strong {
   font-size: 1.15rem;
 }
@@ -846,6 +851,7 @@ h1 {
 .guest-entry span,
 .moderation-entry span,
 .edit-history-entry span,
+.family-member-entry span,
 .memory-edit-heading span {
   color: var(--muted);
   font-weight: 900;
@@ -980,6 +986,9 @@ h1 {
 
 .announcement-editor-panel,
 .announcement-form,
+.family-member-panel,
+.family-member-form,
+.family-member-entry,
 .announcement-edit-entry {
   display: grid;
   gap: 14px;

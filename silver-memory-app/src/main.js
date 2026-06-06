@@ -118,6 +118,7 @@ const initialState = {
   backupImportMessage: '',
   inviteLink: '',
   editorInvites: [],
+  familyMembers: [],
   ownedGuestbookEntries: [],
   memoryUser: null,
   designTheme: DEFAULT_DESIGN_THEME,
@@ -445,7 +446,7 @@ async function runGuestbookOwnerAction(action) {
 }
 
 function normalizeApiMemorial(data, current = state) {
-  const { profile, timeline, moments, guestbook, announcements, editorInvites, editHistory } = data
+  const { profile, timeline, moments, guestbook, announcements, editorInvites, familyMembers, editHistory } = data
   const currentEditorLabel = data.currentEditorLabel ?? ''
   const normalizedGuestbook = guestbook.map((entry) => normalizeGuestbookEntry(entry))
 
@@ -497,6 +498,7 @@ function normalizeApiMemorial(data, current = state) {
       lastUsedAt: formatDateTime(invite.lastUsedAt),
       createdAt: formatDateTime(invite.createdAt),
     })),
+    familyMembers: (familyMembers ?? []).map(normalizeFamilyMember),
     editHistory: (editHistory ?? []).map((event) => ({
       id: String(event.id),
       editorName: event.editorName,
@@ -648,6 +650,19 @@ function normalizeAnnouncement(item) {
     pinned: Boolean(item.pinned),
     createdAt: formatDate(item.createdAt),
     updatedAt: formatDate(item.updatedAt ?? item.createdAt),
+  }
+}
+
+function normalizeFamilyMember(member) {
+  return {
+    id: String(member.id),
+    userId: member.userId,
+    email: member.email ?? '',
+    displayName: member.displayName ?? '',
+    role: member.role ?? 'editor',
+    status: member.status ?? 'active',
+    createdAt: formatDateTime(member.createdAt),
+    updatedAt: formatDateTime(member.updatedAt),
   }
 }
 
@@ -1476,6 +1491,8 @@ function renderEditor() {
         </div>
       </div>
 
+      ${renderFamilyMemberPanel()}
+
       <div class="panel">
         <div class="section-title">
           <p>타임라인</p>
@@ -1625,7 +1642,7 @@ function renderBackupImportPreview() {
     <div class="backup-import-preview">
       <strong>${escapeHtml(backup.profile.name || '이름 없음')}</strong>
       <p>
-        타임라인 ${backup.timeline.length.toLocaleString('ko-KR')}개 · 기억 카드 ${backup.moments.length.toLocaleString('ko-KR')}개 · 방명록 ${backup.guestbook.length.toLocaleString('ko-KR')}개 · 공지 ${backup.announcements.length.toLocaleString('ko-KR')}개
+        타임라인 ${backup.timeline.length.toLocaleString('ko-KR')}개 · 기억 카드 ${backup.moments.length.toLocaleString('ko-KR')}개 · 방명록 ${backup.guestbook.length.toLocaleString('ko-KR')}개 · 공지 ${backup.announcements.length.toLocaleString('ko-KR')}개 · 가족 권한 ${backup.familyMembers.length.toLocaleString('ko-KR')}개
       </p>
       <p class="form-note">
         내보낸 시각: ${escapeHtml(formatDateTime(backup.exportedAt) || backup.exportedAt || '-')}
@@ -2096,6 +2113,99 @@ function renderEditorInvite(invite) {
   `
 }
 
+function renderFamilyMemberPanel() {
+  const currentUser = state.memoryUser
+  const currentFamilyMember = currentUser
+    ? state.familyMembers.find((member) => member.userId === currentUser.userId && member.status === 'active')
+    : null
+  const registeredCurrentUser = currentUser
+    ? Boolean(currentFamilyMember)
+    : false
+  const selectedRole = currentFamilyMember?.role ?? 'editor'
+
+  return `
+    <div class="panel editor-wide family-member-panel">
+      <div class="section-title">
+        <p>가족 권한</p>
+        <h2>Google 계정으로 편집 권한 관리</h2>
+      </div>
+      <p class="form-note">
+        유족 코드로 한 번 등록한 가족은 이후 Google 로그인만으로 편집기에 들어올 수 있습니다.
+      </p>
+      ${
+        currentUser
+          ? `
+            <form class="family-member-form" data-family-member-form>
+              <input type="hidden" name="userId" value="${escapeHtml(currentUser.userId)}" />
+              <input type="hidden" name="email" value="${escapeHtml(currentUser.email || '')}" />
+              <label>
+                표시 이름
+                <input name="displayName" value="${escapeHtml(currentUser.displayName || currentUser.email || '가족')}" required />
+              </label>
+              <label>
+                역할
+                <select name="role">
+                  ${familyRoleOption('owner', '소유자', selectedRole)}
+                  ${familyRoleOption('editor', '편집자', selectedRole)}
+                  ${familyRoleOption('viewer', '열람자', selectedRole)}
+                </select>
+              </label>
+              <button type="submit" class="secondary-button">
+                ${registeredCurrentUser ? '현재 Google 계정 권한 갱신' : '현재 Google 계정을 가족으로 등록'}
+              </button>
+            </form>
+          `
+          : '<p class="form-note">가족 권한을 등록하려면 먼저 Google 로그인 버튼을 눌러주세요.</p>'
+      }
+      <div class="family-member-list">
+        ${state.familyMembers.length ? state.familyMembers.map(renderFamilyMemberEntry).join('') : '<p class="empty-text">아직 등록된 가족 계정이 없습니다.</p>'}
+      </div>
+    </div>
+  `
+}
+
+function familyRoleOption(value, label, selectedValue = 'editor') {
+  return `<option value="${escapeHtml(value)}" ${value === selectedValue ? 'selected' : ''}>${escapeHtml(label)}</option>`
+}
+
+function familyRoleLabel(role) {
+  const labels = {
+    owner: '소유자',
+    editor: '편집자',
+    viewer: '열람자',
+  }
+
+  return labels[role] ?? role ?? '편집자'
+}
+
+function renderFamilyMemberEntry(member) {
+  const active = member.status === 'active'
+  const name = member.displayName || member.email || member.userId
+
+  return `
+    <article class="family-member-entry ${active ? '' : 'is-muted'}">
+      <div>
+        <strong>${escapeHtml(name)}</strong>
+        <span>${escapeHtml(familyRoleLabel(member.role))}</span>
+        <span>${escapeHtml(active ? '활성' : '회수됨')}</span>
+      </div>
+      <p>${escapeHtml(member.email || member.userId)}</p>
+      <small>${member.updatedAt ? `최근 변경 ${escapeHtml(member.updatedAt)}` : `등록 ${escapeHtml(member.createdAt)}`}</small>
+      ${
+        active
+          ? `
+            <div class="button-row">
+              <button type="button" class="secondary-button" data-revoke-family-member="${escapeHtml(member.id)}">
+                권한 회수
+              </button>
+            </div>
+          `
+          : ''
+      }
+    </article>
+  `
+}
+
 function renderTimelineEditorEntry(item) {
   return `
     <form class="memory-edit-entry" data-life-event-edit-form="${escapeHtml(item.id)}">
@@ -2183,6 +2293,9 @@ function editActionLabel(actionType) {
     moment_deleted: '기억 카드 삭제',
     editor_invite_created: '가족 초대',
     editor_invite_revoked: '초대 회수',
+    family_member_upserted: '가족 권한 등록',
+    family_member_updated: '가족 권한 수정',
+    family_member_revoked: '가족 권한 회수',
     guestbook_moderated: '방명록 관리',
     guestbook_author_updated: '방명록 직접 수정',
     guestbook_author_deleted: '방명록 직접 삭제',
@@ -2262,6 +2375,7 @@ function bindGlobalEvents() {
   app.querySelector('[data-timeline-form]')?.addEventListener('submit', handleTimelineForm)
   app.querySelector('[data-moment-form]')?.addEventListener('submit', handleMomentForm)
   app.querySelector('[data-invite-form]')?.addEventListener('submit', handleInviteForm)
+  app.querySelector('[data-family-member-form]')?.addEventListener('submit', handleFamilyMemberForm)
   app.querySelectorAll('[data-copy-text]').forEach((button) => {
     button.addEventListener('click', () => copyTextToClipboard(button.dataset.copyText ?? '', button))
   })
@@ -2288,6 +2402,9 @@ function bindGlobalEvents() {
     ?.addEventListener('click', applyBackupImport)
   app.querySelectorAll('[data-revoke-invite]').forEach((button) => {
     button.addEventListener('click', () => revokeEditorInvite(button.dataset.revokeInvite))
+  })
+  app.querySelectorAll('[data-revoke-family-member]').forEach((button) => {
+    button.addEventListener('click', () => revokeFamilyMember(button.dataset.revokeFamilyMember))
   })
   app.querySelectorAll('[data-delete-life-event]').forEach((button) => {
     button.addEventListener('click', () => deleteLifeEvent(button.dataset.deleteLifeEvent))
@@ -3153,6 +3270,99 @@ async function revokeEditorInvite(id) {
     await apiRequest(`/api/memory/editor-invites/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({
+        editorName: currentEditorName(),
+      }),
+    })
+    await loadFromApi({ includeModeration: true, activeTab: 'editor' })
+  })
+
+  if (!ok) return
+}
+
+async function handleFamilyMemberForm(event) {
+  event.preventDefault()
+  const form = event.currentTarget
+  const formData = new FormData(form)
+  const payload = {
+    userId: formText(formData, 'userId'),
+    email: formText(formData, 'email') || null,
+    displayName: formText(formData, 'displayName') || null,
+    role: formText(formData, 'role') || 'editor',
+    editorName: currentEditorName(),
+  }
+
+  if (!payload.userId) {
+    setState((current) => ({
+      ...current,
+      apiError: 'Google 로그인 사용자 정보가 없습니다.',
+    }))
+    return
+  }
+
+  if (!state.isApiBacked) {
+    setState((current) => {
+      const nextMember = {
+        id: `fm-${Date.now()}`,
+        userId: payload.userId,
+        email: payload.email || '',
+        displayName: payload.displayName || '',
+        role: payload.role,
+        status: 'active',
+        createdAt: new Date().toLocaleString('ko-KR'),
+        updatedAt: new Date().toLocaleString('ko-KR'),
+      }
+
+      return {
+        ...current,
+        familyMembers: [
+          nextMember,
+          ...current.familyMembers.filter((member) => member.userId !== payload.userId),
+        ],
+        editHistory: [
+          buildLocalEditEvent('family_member_upserted', `${nextMember.displayName || '가족'} 권한을 등록했습니다.`),
+          ...current.editHistory,
+        ],
+      }
+    })
+    return
+  }
+
+  const ok = await runApiAction(async () => {
+    await apiRequest(`/api/memory/memorials/${currentMemorySlug()}/family-members`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    await loadFromApi({ includeModeration: true, activeTab: 'editor' })
+  })
+
+  if (!ok) return
+}
+
+async function revokeFamilyMember(id) {
+  if (!id || !window.confirm('이 가족 계정의 편집 권한을 회수할까요?')) return
+
+  if (!state.isApiBacked) {
+    setState((current) => ({
+      ...current,
+      familyMembers: current.familyMembers.map((member) =>
+        String(member.id) === String(id) ? { ...member, status: 'revoked' } : member,
+      ),
+      editHistory: [
+        buildLocalEditEvent('family_member_revoked', '가족 권한을 회수했습니다.'),
+        ...current.editHistory,
+      ],
+    }))
+    return
+  }
+
+  const currentMember = state.familyMembers.find((member) => String(member.id) === String(id))
+  const ok = await runApiAction(async () => {
+    await apiRequest(`/api/memory/family-members/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        displayName: currentMember?.displayName || null,
+        role: currentMember?.role || 'editor',
+        status: 'revoked',
         editorName: currentEditorName(),
       }),
     })
@@ -4139,6 +4349,7 @@ function downloadMemoryBackup() {
     moments: state.moments,
     guestbook: state.guestbook,
     announcements: state.announcements,
+    familyMembers: state.familyMembers,
     editorInvites: state.editorInvites.map((invite) => ({
       id: invite.id,
       inviteeLabel: invite.inviteeLabel,
@@ -4231,6 +4442,7 @@ function applyBackupImport() {
     moments: backup.moments,
     guestbook: backup.guestbook,
     announcements: backup.announcements,
+    familyMembers: backup.familyMembers,
     editorInvites: backup.editorInvites,
     editHistory: [
       buildLocalEditEvent('backup_restored', '백업 파일을 이 브라우저에 임시 복구했습니다.'),
@@ -4275,6 +4487,7 @@ function normalizeMemoryBackup(value) {
     moments: normalizeBackupMoments(value.moments),
     guestbook: normalizeBackupGuestbook(value.guestbook),
     announcements: normalizeBackupAnnouncements(value.announcements),
+    familyMembers: normalizeBackupFamilyMembers(value.familyMembers),
     editorInvites: normalizeBackupInvites(value.editorInvites),
     editHistory: normalizeBackupEditHistory(value.editHistory),
   }
@@ -4337,6 +4550,23 @@ function normalizeBackupAnnouncements(value) {
       updatedAt: stringOr(item.updatedAt, ''),
     }
   })
+}
+
+function normalizeBackupFamilyMembers(value) {
+  return arrayOrEmpty(value).map((rawMember, index) => {
+    const member = objectOrEmpty(rawMember)
+
+    return {
+      id: stringOr(member.id, `restore-fm${index + 1}`),
+      userId: stringOr(member.userId, ''),
+      email: stringOr(member.email, ''),
+      displayName: stringOr(member.displayName, ''),
+      role: allowedValue(member.role, ['owner', 'editor', 'viewer'], 'editor'),
+      status: allowedValue(member.status, ['active', 'revoked'], 'revoked'),
+      createdAt: stringOr(member.createdAt, ''),
+      updatedAt: stringOr(member.updatedAt, ''),
+    }
+  }).filter((member) => member.userId)
 }
 
 function normalizeBackupInvites(value) {
