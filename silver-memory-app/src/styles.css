@@ -365,6 +365,39 @@ main {
   font-weight: 900;
 }
 
+.hero-image-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.hero-image-preview {
+  display: grid;
+  aspect-ratio: 4 / 3;
+  min-height: 220px;
+  overflow: hidden;
+  place-items: center;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.hero-image-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-image-empty {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--accent-strong);
+  font-size: 5rem;
+  font-weight: 900;
+}
+
 .hero-copy {
   display: flex;
   min-height: 320px;

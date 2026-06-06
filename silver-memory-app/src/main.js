@@ -7,6 +7,7 @@ const DEFAULT_DESIGN_THEME = 'warm'
 const DEFAULT_MEMORIAL_KIND = 'person'
 const DEFAULT_PAGE_TEMPLATE = 'classic'
 const MAX_PROFILE_TAGS = 12
+const MAX_HERO_IMAGE_BYTES = 5 * 1024 * 1024
 const DESIGN_THEMES = [
   {
     id: 'warm',
@@ -106,6 +107,8 @@ const initialState = {
   currentEditorLabel: '',
   lastIssuedEditorToken: '',
   lastBackupDownloadedAt: '',
+  pendingHeroPreview: '',
+  pendingHeroFileName: '',
   inviteLink: '',
   editorInvites: [],
   designTheme: DEFAULT_DESIGN_THEME,
@@ -248,6 +251,8 @@ function saveState() {
     apiError,
     isPrivateBlocked,
     currentEditorLabel,
+    pendingHeroPreview,
+    pendingHeroFileName,
     ...persistedState
   } = state
   window.localStorage.setItem(storageKey(), JSON.stringify(persistedState))
@@ -394,6 +399,8 @@ function normalizeApiMemorial(data, current = state) {
     memorialKind: profile.memorialKind ?? DEFAULT_MEMORIAL_KIND,
     pageTemplate: profile.pageTemplate ?? DEFAULT_PAGE_TEMPLATE,
     currentEditorLabel,
+    pendingHeroPreview: '',
+    pendingHeroFileName: '',
     editorName: shouldUseCurrentEditorLabel(current.editorName, currentEditorLabel)
       ? currentEditorLabel
       : current.editorName,
@@ -1160,10 +1167,7 @@ function renderEditor() {
             ${selectOption('public', '전체 공개')}
           </select>
         </label>
-        <label>
-          대표 사진
-          <input name="heroImage" type="file" accept="image/*" />
-        </label>
+        ${renderHeroImageEditor()}
         <div class="button-row">
           <button type="submit" class="primary-button">저장하기</button>
           <button type="button" class="secondary-button" data-download-qr>
@@ -1291,6 +1295,37 @@ function renderEditor() {
         </div>
       </div>
     </section>
+  `
+}
+
+function renderHeroImageEditor() {
+  const previewImage = state.pendingHeroPreview || state.profile.heroImage
+  const previewLabel = state.pendingHeroPreview ? '저장 전 미리보기' : '현재 대표 사진'
+  const fileName = state.pendingHeroFileName
+
+  return `
+    <div class="hero-image-editor">
+      <span class="field-label">대표 사진</span>
+      <div class="hero-image-preview" aria-label="대표 사진 미리보기">
+        ${
+          previewImage
+            ? `<img src="${escapeHtml(previewImage)}" alt="${escapeHtml(state.profile.name)} 대표 사진 미리보기" />`
+            : `<div class="hero-image-empty">${escapeHtml((state.profile.name || '기').slice(0, 1))}</div>`
+        }
+      </div>
+      <p class="form-note">
+        ${escapeHtml(previewLabel)}${fileName ? ` · ${escapeHtml(fileName)}` : ''}. JPG, PNG, WebP, GIF 파일을 5MB 이하로 올려주세요.
+      </p>
+      <label>
+        사진 선택
+        <input name="heroImage" type="file" accept="image/*" data-hero-image-input />
+      </label>
+      ${
+        state.pendingHeroPreview
+          ? '<p class="form-note">선택한 사진은 저장하기를 눌러야 방문자 화면에 반영됩니다.</p>'
+          : ''
+      }
+    </div>
   `
 }
 
@@ -1839,6 +1874,7 @@ function bindGlobalEvents() {
 
   app.querySelector('[data-guest-form]')?.addEventListener('submit', handleGuestForm)
   app.querySelector('[data-profile-form]')?.addEventListener('submit', handleProfileForm)
+  app.querySelector('[data-hero-image-input]')?.addEventListener('change', handleHeroImagePreview)
   app.querySelector('[data-quick-record-form]')?.addEventListener('submit', handleQuickRecordForm)
   app.querySelector('[data-timeline-form]')?.addEventListener('submit', handleTimelineForm)
   app.querySelector('[data-moment-form]')?.addEventListener('submit', handleMomentForm)
@@ -2121,6 +2157,10 @@ async function handleProfileForm(event) {
     ...(readProfileDraftFromEditor(state.profile, form) ?? state.profile),
   }
 
+  if (file?.size && !validateHeroImageFile(file)) {
+    return
+  }
+
   if (state.isApiBacked) {
     const ok = await runApiAction(async () => {
       const heroImage = file?.size ? await uploadMemoryImage(file) : state.profile.heroImage
@@ -2156,6 +2196,8 @@ async function handleProfileForm(event) {
       ...profile,
       heroImage,
     },
+    pendingHeroPreview: '',
+    pendingHeroFileName: '',
     memorialKind: currentMemorialKind().id,
     pageTemplate: currentPageTemplate().id,
     editHistory: [
@@ -2164,6 +2206,58 @@ async function handleProfileForm(event) {
     ],
     tagSuggestions: [],
   }))
+}
+
+async function handleHeroImagePreview(event) {
+  const file = event.target.files?.[0]
+
+  if (!file) {
+    setState((current) => ({
+      ...current,
+      pendingHeroPreview: '',
+      pendingHeroFileName: '',
+      apiError: '',
+    }))
+    return
+  }
+
+  if (!validateHeroImageFile(file)) {
+    event.target.value = ''
+    return
+  }
+
+  const preview = await readFileAsDataUrl(file)
+
+  setState((current) => ({
+    ...current,
+    pendingHeroPreview: preview,
+    pendingHeroFileName: file.name,
+    apiError: '',
+  }))
+}
+
+function validateHeroImageFile(file) {
+  if (!file.type.startsWith('image/')) {
+    setState((current) => ({
+      ...current,
+      pendingHeroPreview: '',
+      pendingHeroFileName: '',
+      apiError: '대표 사진은 이미지 파일만 선택할 수 있습니다.',
+    }))
+    return false
+  }
+
+  if (file.size > MAX_HERO_IMAGE_BYTES) {
+    setState((current) => ({
+      ...current,
+      pendingHeroPreview: '',
+      pendingHeroFileName: '',
+      apiError: '대표 사진은 5MB 이하 파일만 올릴 수 있습니다.',
+    }))
+    return false
+  }
+
+  return true
 }
 
 async function handleDesignSave(event) {
