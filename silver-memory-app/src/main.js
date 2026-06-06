@@ -103,6 +103,64 @@ const PAGE_TEMPLATES = [
     description: '짧은 장면을 크게 넘겨보기',
   },
 ]
+const EDIT_ACTION_LABELS = {
+  memorial_created: '생성',
+  profile_updated: '프로필 수정',
+  life_event_created: '타임라인 추가',
+  life_event_updated: '타임라인 수정',
+  life_event_deleted: '타임라인 삭제',
+  moment_created: '기억 카드 추가',
+  moment_updated: '기억 카드 수정',
+  moment_deleted: '기억 카드 삭제',
+  editor_invite_created: '가족 초대',
+  editor_invite_revoked: '초대 회수',
+  family_member_upserted: '가족 권한 등록',
+  family_member_updated: '가족 권한 수정',
+  family_member_revoked: '가족 권한 회수',
+  guestbook_moderated: '방명록 관리',
+  guestbook_author_updated: '방명록 직접 수정',
+  guestbook_author_deleted: '방명록 직접 삭제',
+  announcement_created: '공지 추가',
+  announcement_updated: '공지 수정',
+  announcement_deleted: '공지 삭제',
+  backup_restored: '백업 복구',
+}
+const TARGET_TYPE_LABELS = {
+  memorial: '생애 페이지',
+  life_event: '타임라인',
+  moment: '기억 카드',
+  announcement: '공지사항',
+  guestbook: '방명록',
+  family_member: '가족 권한',
+  editor_invite: '가족 초대',
+}
+const SNAPSHOT_FIELD_LABELS = {
+  displayName: '이름',
+  years: '생몰연도',
+  subtitle: '소개',
+  location: '지역',
+  visibility: '공개 범위',
+  heroImageUrl: '대표 사진',
+  tags: '태그',
+  designTheme: '테마',
+  memorialKind: '기억 대상',
+  pageTemplate: '구성',
+  eventYear: '시기',
+  title: '제목',
+  body: '내용',
+  sortOrder: '정렬',
+  tag: '분류',
+  mediaUrl: '미디어',
+  announcementType: '공지 유형',
+  pinned: '고정',
+  author: '작성자',
+  relation: '관계',
+  message: '메시지',
+  status: '상태',
+  updatedAt: '수정 시각',
+  moderatedAt: '검수 시각',
+  deletedAt: '삭제 시각',
+}
 
 const initialState = {
   activeTab: 'life',
@@ -2335,17 +2393,7 @@ function renderContentRevisionEntry(revision) {
 }
 
 function targetTypeLabel(targetType) {
-  const labels = {
-    memorial: '생애 페이지',
-    life_event: '타임라인',
-    moment: '기억 카드',
-    announcement: '공지사항',
-    guestbook: '방명록',
-    family_member: '가족 권한',
-    editor_invite: '가족 초대',
-  }
-
-  return labels[targetType] ?? targetType ?? '항목'
+  return TARGET_TYPE_LABELS[targetType] ?? targetType ?? '항목'
 }
 
 function renderRevisionSnapshot(snapshotText, emptyMessage) {
@@ -2389,35 +2437,7 @@ function parseSnapshot(snapshotText) {
 }
 
 function snapshotFieldLabel(key) {
-  const labels = {
-    displayName: '이름',
-    years: '생몰연도',
-    subtitle: '소개',
-    location: '지역',
-    visibility: '공개 범위',
-    heroImageUrl: '대표 사진',
-    tags: '태그',
-    designTheme: '테마',
-    memorialKind: '기억 대상',
-    pageTemplate: '구성',
-    eventYear: '시기',
-    title: '제목',
-    body: '내용',
-    sortOrder: '정렬',
-    tag: '분류',
-    mediaUrl: '미디어',
-    announcementType: '공지 유형',
-    pinned: '고정',
-    author: '작성자',
-    relation: '관계',
-    message: '메시지',
-    status: '상태',
-    updatedAt: '수정 시각',
-    moderatedAt: '검수 시각',
-    deletedAt: '삭제 시각',
-  }
-
-  return labels[key] ?? key
+  return SNAPSHOT_FIELD_LABELS[key] ?? key
 }
 
 function snapshotValue(value) {
@@ -2429,30 +2449,7 @@ function snapshotValue(value) {
 }
 
 function editActionLabel(actionType) {
-  const labels = {
-    memorial_created: '생성',
-    profile_updated: '프로필 수정',
-    life_event_created: '타임라인 추가',
-    life_event_updated: '타임라인 수정',
-    life_event_deleted: '타임라인 삭제',
-    moment_created: '기억 카드 추가',
-    moment_updated: '기억 카드 수정',
-    moment_deleted: '기억 카드 삭제',
-    editor_invite_created: '가족 초대',
-    editor_invite_revoked: '초대 회수',
-    family_member_upserted: '가족 권한 등록',
-    family_member_updated: '가족 권한 수정',
-    family_member_revoked: '가족 권한 회수',
-    guestbook_moderated: '방명록 관리',
-    guestbook_author_updated: '방명록 직접 수정',
-    guestbook_author_deleted: '방명록 직접 삭제',
-    announcement_created: '공지 추가',
-    announcement_updated: '공지 수정',
-    announcement_deleted: '공지 삭제',
-    backup_restored: '백업 복구',
-  }
-
-  return labels[actionType] ?? actionType ?? '편집'
+  return EDIT_ACTION_LABELS[actionType] ?? actionType ?? '편집'
 }
 
 function buildLocalEditEvent(actionType, summary) {
