@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'silver-memory-demo'
 const DEFAULT_MEMORY_SLUG = 'kim-youngsu'
+const BUSINESS_INQUIRY_EMAIL = 'dgldev22@gmail.com'
 const API_BASE_URL =
   window.SILVER_MEMORY_API_BASE_URL ??
   (window.location.port === '5175' ? 'http://127.0.0.1:8080' : '')
@@ -698,6 +699,22 @@ function memoryBusinessUrl() {
   return `${memoryBaseUrl()}#/business`
 }
 
+function businessInquiryUrl() {
+  const subject = encodeURIComponent('[Silver Memory] QR 추모관 제휴 문의')
+  const body = encodeURIComponent(
+    [
+      '기관명:',
+      '담당자:',
+      '연락처:',
+      '월 평균 장례/안치/추모 건수:',
+      '관심 상품: 파일럿 / 스탠다드 / 프리미엄',
+      '궁금한 점:',
+    ].join('\n'),
+  )
+
+  return `mailto:${BUSINESS_INQUIRY_EMAIL}?subject=${subject}&body=${body}`
+}
+
 function memoryBaseUrl() {
   const url = new URL(window.location.href)
 
@@ -968,11 +985,11 @@ function renderBusinessLanding() {
           인쇄 QR 카드부터 묘비 스티커, 유족 편집기까지 한 흐름으로 준비합니다.
         </p>
         <div class="button-row">
-          <a class="primary-link-button" href="${escapeHtml(memoryPageUrlForSlug(DEFAULT_MEMORY_SLUG))}">
-            샘플 추모관 보기
+          <a class="primary-link-button" href="${escapeHtml(businessInquiryUrl())}">
+            제휴 문의하기
           </a>
-          <a class="secondary-link-button" href="${escapeHtml(memoryCreateUrl())}">
-            파일럿 추모관 만들기
+          <a class="secondary-link-button" href="${escapeHtml(memoryPageUrlForSlug(DEFAULT_MEMORY_SLUG))}">
+            샘플 추모관 보기
           </a>
         </div>
       </div>
@@ -1035,6 +1052,28 @@ function renderBusinessLanding() {
         ${renderBusinessStep('3', '방문자가 생애 페이지와 방명록 이용')}
         ${renderBusinessStep('4', '유족이 편집/공개 범위/백업 관리')}
       </div>
+    </section>
+
+    <section class="business-section business-contact">
+      <div class="section-title">
+        <p>제휴 문의</p>
+        <h2>파일럿은 한 지점, 한 상품부터 시작할 수 있습니다</h2>
+      </div>
+      <div class="business-contact-grid">
+        ${renderBusinessValue('문의 전에 준비할 것', '기관명, 담당자 연락처, 월 평균 진행 건수, QR을 제공할 상품 범위를 정리하면 빠르게 견적을 잡을 수 있습니다.')}
+        ${renderBusinessValue('초기 파일럿 범위', '샘플 추모관 1개, QR 카드 이미지, 유족 안내 문구, 현장 직원용 설명 스크립트를 먼저 제공합니다.')}
+      </div>
+      <div class="business-contact-actions">
+        <a class="primary-link-button" href="${escapeHtml(businessInquiryUrl())}">
+          제휴 문의 메일 보내기
+        </a>
+        <a class="secondary-link-button" href="${escapeHtml(memoryCreateUrl())}">
+          파일럿 추모관 만들기
+        </a>
+      </div>
+      <p class="business-contact-note">
+        결제/정산 기능은 파일럿 이후 붙이고, 초기에는 QR 추모관 생성과 유족 편집 흐름을 먼저 검증합니다.
+      </p>
     </section>
   `
 }
