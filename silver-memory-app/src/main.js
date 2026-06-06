@@ -109,6 +109,8 @@ const initialState = {
   lastBackupDownloadedAt: '',
   pendingHeroPreview: '',
   pendingHeroFileName: '',
+  pendingBackupImport: null,
+  backupImportMessage: '',
   inviteLink: '',
   editorInvites: [],
   designTheme: DEFAULT_DESIGN_THEME,
@@ -253,6 +255,8 @@ function saveState() {
     currentEditorLabel,
     pendingHeroPreview,
     pendingHeroFileName,
+    pendingBackupImport,
+    backupImportMessage,
     ...persistedState
   } = state
   window.localStorage.setItem(storageKey(), JSON.stringify(persistedState))
@@ -401,6 +405,8 @@ function normalizeApiMemorial(data, current = state) {
     currentEditorLabel,
     pendingHeroPreview: '',
     pendingHeroFileName: '',
+    pendingBackupImport: null,
+    backupImportMessage: '',
     editorName: shouldUseCurrentEditorLabel(current.editorName, currentEditorLabel)
       ? currentEditorLabel
       : current.editorName,
@@ -1349,6 +1355,49 @@ function renderBackupPanel() {
           백업 파일 다운로드
         </button>
       </div>
+      <div class="backup-import-box">
+        <span class="field-label">백업 파일 가져오기</span>
+        <label>
+          JSON 백업 파일 선택
+          <input type="file" accept="application/json,.json" data-backup-import-input />
+        </label>
+        <p class="form-note">
+          선택한 파일은 먼저 내용만 확인합니다. 운영 DB에는 바로 쓰지 않고, 이 브라우저에서 임시로 열어볼 수 있습니다.
+        </p>
+        ${renderBackupImportPreview()}
+      </div>
+    </div>
+  `
+}
+
+function renderBackupImportPreview() {
+  const backup = state.pendingBackupImport
+
+  if (state.backupImportMessage && !backup) {
+    return `<p class="form-note">${escapeHtml(state.backupImportMessage)}</p>`
+  }
+
+  if (!backup) return ''
+
+  return `
+    <div class="backup-import-preview">
+      <strong>${escapeHtml(backup.profile.name || '이름 없음')}</strong>
+      <p>
+        타임라인 ${backup.timeline.length.toLocaleString('ko-KR')}개 · 기억 카드 ${backup.moments.length.toLocaleString('ko-KR')}개 · 방명록 ${backup.guestbook.length.toLocaleString('ko-KR')}개
+      </p>
+      <p class="form-note">
+        내보낸 시각: ${escapeHtml(formatDateTime(backup.exportedAt) || backup.exportedAt || '-')}
+      </p>
+      <div class="button-row">
+        <button type="button" class="secondary-button" data-apply-backup-import>
+          브라우저에 임시 복구
+        </button>
+      </div>
+      ${
+        state.backupImportMessage
+          ? `<p class="form-note">${escapeHtml(state.backupImportMessage)}</p>`
+          : ''
+      }
     </div>
   `
 }
@@ -1813,6 +1862,7 @@ function editActionLabel(actionType) {
     editor_invite_created: '가족 초대',
     editor_invite_revoked: '초대 회수',
     guestbook_moderated: '방명록 관리',
+    backup_restored: '백업 복구',
   }
 
   return labels[actionType] ?? actionType ?? '편집'
@@ -1894,6 +1944,12 @@ function bindGlobalEvents() {
   app.querySelectorAll('[data-download-backup]').forEach((button) => {
     button.addEventListener('click', downloadMemoryBackup)
   })
+  app
+    .querySelector('[data-backup-import-input]')
+    ?.addEventListener('change', handleBackupImportFile)
+  app
+    .querySelector('[data-apply-backup-import]')
+    ?.addEventListener('click', applyBackupImport)
   app.querySelectorAll('[data-revoke-invite]').forEach((button) => {
     button.addEventListener('click', () => revokeEditorInvite(button.dataset.revokeInvite))
   })
@@ -3511,6 +3567,210 @@ function downloadMemoryBackup() {
       minute: '2-digit',
     }),
   }))
+}
+
+async function handleBackupImportFile(event) {
+  const file = event.target.files?.[0]
+
+  if (!file) {
+    setState((current) => ({
+      ...current,
+      pendingBackupImport: null,
+      backupImportMessage: '',
+    }))
+    return
+  }
+
+  try {
+    const text = await file.text()
+    const parsed = JSON.parse(text)
+    const backup = normalizeMemoryBackup(parsed)
+
+    setState((current) => ({
+      ...current,
+      pendingBackupImport: backup,
+      backupImportMessage: `${file.name} 파일을 확인했습니다. 내용을 보고 임시 복구를 선택해 주세요.`,
+      apiError: '',
+    }))
+  } catch (error) {
+    event.target.value = ''
+    setState((current) => ({
+      ...current,
+      pendingBackupImport: null,
+      backupImportMessage: 'Silver Memory 백업 파일을 읽지 못했습니다. JSON 파일과 백업 형식을 확인해 주세요.',
+    }))
+  }
+}
+
+function applyBackupImport() {
+  const backup = state.pendingBackupImport
+
+  if (!backup) return
+
+  const restoredAt = new Date().toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  const restoreMessage = `백업을 이 브라우저에 임시 복구했습니다. 운영 DB에는 아직 반영되지 않았습니다. (${restoredAt})`
+
+  setState((current) => ({
+    ...current,
+    isApiBacked: false,
+    activeTab: 'life',
+    storyIndex: 0,
+    profile: backup.profile,
+    timeline: backup.timeline,
+    moments: backup.moments,
+    guestbook: backup.guestbook,
+    editorInvites: backup.editorInvites,
+    editHistory: [
+      buildLocalEditEvent('backup_restored', '백업 파일을 이 브라우저에 임시 복구했습니다.'),
+      ...backup.editHistory,
+    ],
+    designTheme: backup.designTheme,
+    memorialKind: backup.memorialKind,
+    pageTemplate: backup.pageTemplate,
+    tagSuggestions: [],
+    pendingHeroPreview: '',
+    pendingHeroFileName: '',
+    pendingBackupImport: null,
+    backupImportMessage: restoreMessage,
+    apiError: restoreMessage,
+  }))
+}
+
+function normalizeMemoryBackup(value) {
+  if (!value || typeof value !== 'object' || value.schema !== 'silver-memory-backup.v1') {
+    throw new Error('Unsupported backup schema')
+  }
+
+  const profile = value.profile && typeof value.profile === 'object' ? value.profile : {}
+  const normalizedProfile = {
+    slug: stringOr(profile.slug, state.profile.slug || DEFAULT_MEMORY_SLUG),
+    name: stringOr(profile.name, '이름 없음'),
+    years: stringOr(profile.years, ''),
+    subtitle: stringOr(profile.subtitle, ''),
+    location: stringOr(profile.location, ''),
+    visibility: allowedValue(profile.visibility, ['private', 'link', 'public'], 'link'),
+    heroImage: stringOr(profile.heroImage, ''),
+    tags: normalizeStringList(profile.tags).slice(0, MAX_PROFILE_TAGS),
+  }
+
+  return {
+    exportedAt: stringOr(value.exportedAt, ''),
+    profile: normalizedProfile,
+    designTheme: allowedValue(profile.designTheme, DESIGN_THEMES.map((theme) => theme.id), DEFAULT_DESIGN_THEME),
+    memorialKind: allowedValue(profile.memorialKind, MEMORIAL_KINDS.map((kind) => kind.id), DEFAULT_MEMORIAL_KIND),
+    pageTemplate: allowedValue(profile.pageTemplate, PAGE_TEMPLATES.map((template) => template.id), DEFAULT_PAGE_TEMPLATE),
+    timeline: normalizeBackupTimeline(value.timeline),
+    moments: normalizeBackupMoments(value.moments),
+    guestbook: normalizeBackupGuestbook(value.guestbook),
+    editorInvites: normalizeBackupInvites(value.editorInvites),
+    editHistory: normalizeBackupEditHistory(value.editHistory),
+  }
+}
+
+function normalizeBackupTimeline(value) {
+  return arrayOrEmpty(value).map((rawItem, index) => {
+    const item = objectOrEmpty(rawItem)
+
+    return {
+      id: stringOr(item.id, `restore-t${index + 1}`),
+      year: stringOr(item.year, ''),
+      title: stringOr(item.title, '제목 없음'),
+      body: stringOr(item.body, ''),
+    }
+  })
+}
+
+function normalizeBackupMoments(value) {
+  return arrayOrEmpty(value).map((rawItem, index) => {
+    const item = objectOrEmpty(rawItem)
+
+    return {
+      id: stringOr(item.id, `restore-m${index + 1}`),
+      title: stringOr(item.title, '제목 없음'),
+      body: stringOr(item.body, ''),
+      tag: stringOr(item.tag, '기억'),
+      mediaUrl: safeMediaUrl(stringOr(item.mediaUrl, '')),
+    }
+  })
+}
+
+function normalizeBackupGuestbook(value) {
+  return arrayOrEmpty(value).map((rawEntry, index) => {
+    const entry = objectOrEmpty(rawEntry)
+
+    return {
+      id: stringOr(entry.id, `restore-g${index + 1}`),
+      author: stringOr(entry.author, '방문자'),
+      relation: stringOr(entry.relation, ''),
+      message: stringOr(entry.message, ''),
+      status: allowedValue(entry.status, ['pending', 'approved', 'hidden'], 'pending'),
+      pinned: Boolean(entry.pinned),
+      createdAt: stringOr(entry.createdAt, ''),
+    }
+  })
+}
+
+function normalizeBackupInvites(value) {
+  return arrayOrEmpty(value).map((rawInvite, index) => {
+    const invite = objectOrEmpty(rawInvite)
+
+    return {
+      id: stringOr(invite.id, `restore-i${index + 1}`),
+      inviteeLabel: stringOr(invite.inviteeLabel, '가족'),
+      status: allowedValue(invite.status, ['active', 'revoked'], 'revoked'),
+      expiresAt: stringOr(invite.expiresAt, ''),
+      lastUsedAt: stringOr(invite.lastUsedAt, ''),
+      createdAt: stringOr(invite.createdAt, ''),
+    }
+  })
+}
+
+function normalizeBackupEditHistory(value) {
+  return arrayOrEmpty(value).map((rawEvent, index) => {
+    const event = objectOrEmpty(rawEvent)
+
+    return {
+      id: stringOr(event.id, `restore-e${index + 1}`),
+      editorName: stringOr(event.editorName, '유족'),
+      actionType: stringOr(event.actionType, 'backup_imported'),
+      targetType: stringOr(event.targetType, ''),
+      targetId: event.targetId ?? null,
+      summary: stringOr(event.summary, '백업에 포함된 편집 기록입니다.'),
+      createdAt: stringOr(event.createdAt, ''),
+    }
+  })
+}
+
+function arrayOrEmpty(value) {
+  return Array.isArray(value) ? value : []
+}
+
+function objectOrEmpty(value) {
+  return value && typeof value === 'object' ? value : {}
+}
+
+function normalizeStringList(value) {
+  return arrayOrEmpty(value)
+    .map((item) => String(item ?? '').trim())
+    .filter(Boolean)
+}
+
+function stringOr(value, fallback) {
+  const normalized = String(value ?? '').trim()
+
+  return normalized || fallback
+}
+
+function allowedValue(value, allowedValues, fallback) {
+  const normalized = String(value ?? '').trim()
+
+  return allowedValues.includes(normalized) ? normalized : fallback
 }
 
 function safeFilenamePart(value) {

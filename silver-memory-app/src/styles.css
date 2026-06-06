@@ -958,6 +958,29 @@ label {
   border-color: var(--accent);
 }
 
+.backup-import-box,
+.backup-import-preview {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 14px;
+}
+
+.backup-import-preview {
+  background: var(--surface);
+}
+
+.backup-import-preview strong {
+  color: var(--ink);
+  font-size: 1.15rem;
+}
+
+.backup-import-preview p {
+  margin-bottom: 0;
+}
+
 .access-note {
   border-left: 4px solid var(--accent);
   padding-left: 0.8rem;
