@@ -141,6 +141,22 @@ const EXHIBITION_PRESETS = [
     memorialKind: 'pet',
   },
 ]
+const TRIBUTE_TIERS = [
+  {
+    id: 'small-flower',
+    label: '작은 꽃',
+    amountLabel: '4,000원',
+    displayLabel: '꽃 한 송이',
+    description: '방명록보다 더 짧게, 조용한 마음을 남깁니다.',
+  },
+  {
+    id: 'memorial-bouquet',
+    label: '추모 꽃다발',
+    amountLabel: '20,000원',
+    displayLabel: '추모 꽃다발',
+    description: '가족에게 오래 보이는 추모의 표시를 남깁니다.',
+  },
+]
 const EDIT_ACTION_LABELS = {
   memorial_created: '생성',
   profile_updated: '프로필 수정',
@@ -212,6 +228,7 @@ const initialState = {
   pendingHeroFileName: '',
   pendingBackupImport: null,
   backupImportMessage: '',
+  tributeMessage: '',
   inviteLink: '',
   editorInvites: [],
   familyMembers: [],
@@ -309,6 +326,17 @@ const initialState = {
       createdAt: '2026.06.01',
     },
   ],
+  tributes: [
+    {
+      id: 'tr1',
+      tierId: 'small-flower',
+      tierLabel: '꽃 한 송이',
+      giverName: '익명 방문자',
+      message: '따뜻한 마음을 남겼습니다.',
+      visibility: 'anonymous',
+      createdAt: '2026.06.01',
+    },
+  ],
   announcements: [
     {
       id: 'a1',
@@ -373,6 +401,7 @@ function saveState() {
     pendingHeroFileName,
     pendingBackupImport,
     backupImportMessage,
+    tributeMessage,
     ...persistedState
   } = state
   window.localStorage.setItem(storageKey(), JSON.stringify(persistedState))
@@ -585,6 +614,7 @@ function normalizeApiMemorial(data, current = state) {
       mediaUrl: item.mediaUrl ?? '',
     })),
     guestbook: normalizedGuestbook,
+    tributes: current.tributes ?? [],
     ownedGuestbookEntries: mergeOwnedGuestbookEntries(current.ownedGuestbookEntries, normalizedGuestbook),
     announcements: (announcements ?? []).map(normalizeAnnouncement),
     editorInvites: (editorInvites ?? []).map((invite) => ({
@@ -1142,12 +1172,14 @@ function renderLife() {
         ${renderTimelinePanel()}
       </section>
       ${renderGuestPreview()}
+      ${renderTributePanel()}
     `
   }
 
   if (template === 'letter') {
     return `
       ${renderGuestPreview()}
+      ${renderTributePanel()}
       <section class="content-grid template-letter">
         ${renderTimelinePanel()}
         <aside class="panel story-panel">
@@ -1175,6 +1207,7 @@ function renderLife() {
         </aside>
       </section>
       ${renderGuestPreview()}
+      ${renderTributePanel()}
     `
   }
 
@@ -1193,6 +1226,7 @@ function renderLife() {
         ${renderTimelinePanel()}
         ${renderCompactGuestPreview()}
       </section>
+      ${renderTributePanel()}
     `
   }
 
@@ -1209,6 +1243,7 @@ function renderLife() {
     </section>
 
     ${renderGuestPreview()}
+    ${renderTributePanel()}
   `
 }
 
@@ -1305,6 +1340,62 @@ function renderGuestPreview() {
         방명록 남기기
       </button>
     </section>
+  `
+}
+
+function renderTributePanel() {
+  const tributes = state.tributes ?? []
+
+  return `
+    <section class="guest-preview tribute-section">
+      <div class="section-title">
+        <p>남겨진 꽃</p>
+        <h2>방문자가 조용히 남긴 마음</h2>
+      </div>
+      <div class="tribute-layout">
+        <div class="tribute-copy">
+          <p>
+            실제 결제 연동 전 시범 기능입니다. 지금은 과금 없이 꽃이 남는 흐름만 확인합니다.
+          </p>
+          ${state.tributeMessage ? `<p class="status-note">${escapeHtml(state.tributeMessage)}</p>` : ''}
+        </div>
+        <div class="tribute-tier-list" aria-label="추모 꽃 선택">
+          ${TRIBUTE_TIERS.map(renderTributeTier).join('')}
+        </div>
+      </div>
+      <div class="tribute-list">
+        ${
+          tributes.length
+            ? tributes.slice(0, 6).map(renderTributeEntry).join('')
+            : '<p class="empty-text">아직 남겨진 꽃이 없습니다.</p>'
+        }
+      </div>
+    </section>
+  `
+}
+
+function renderTributeTier(tier) {
+  return `
+    <article class="tribute-tier-card">
+      <div>
+        <strong>${escapeHtml(tier.label)}</strong>
+        <span>${escapeHtml(tier.amountLabel)}</span>
+      </div>
+      <p>${escapeHtml(tier.description)}</p>
+      <button type="button" class="secondary-button" data-tribute-tier="${escapeHtml(tier.id)}">
+        시범으로 남기기
+      </button>
+    </article>
+  `
+}
+
+function renderTributeEntry(tribute) {
+  return `
+    <article class="tribute-entry">
+      <strong>${escapeHtml(tribute.tierLabel || '꽃')}</strong>
+      <p>${escapeHtml(tribute.message || '따뜻한 마음을 남겼습니다.')}</p>
+      <span>${escapeHtml(tribute.giverName || '익명 방문자')} · ${escapeHtml(tribute.createdAt || '')}</span>
+    </article>
   `
 }
 
@@ -1767,7 +1858,7 @@ function renderBackupImportPreview() {
     <div class="backup-import-preview">
       <strong>${escapeHtml(backup.profile.name || '이름 없음')}</strong>
       <p>
-        타임라인 ${backup.timeline.length.toLocaleString('ko-KR')}개 · 기억 카드 ${backup.moments.length.toLocaleString('ko-KR')}개 · 방명록 ${backup.guestbook.length.toLocaleString('ko-KR')}개 · 공지 ${backup.announcements.length.toLocaleString('ko-KR')}개 · 가족 권한 ${backup.familyMembers.length.toLocaleString('ko-KR')}개 · 버전 ${backup.contentRevisions.length.toLocaleString('ko-KR')}개
+        타임라인 ${backup.timeline.length.toLocaleString('ko-KR')}개 · 기억 카드 ${backup.moments.length.toLocaleString('ko-KR')}개 · 방명록 ${backup.guestbook.length.toLocaleString('ko-KR')}개 · 꽃 ${backup.tributes.length.toLocaleString('ko-KR')}개 · 공지 ${backup.announcements.length.toLocaleString('ko-KR')}개 · 가족 권한 ${backup.familyMembers.length.toLocaleString('ko-KR')}개 · 버전 ${backup.contentRevisions.length.toLocaleString('ko-KR')}개
       </p>
       <p class="form-note">
         내보낸 시각: ${escapeHtml(formatDateTime(backup.exportedAt) || backup.exportedAt || '-')}
@@ -2620,6 +2711,9 @@ function bindGlobalEvents() {
   app.querySelectorAll('[data-download-backup]').forEach((button) => {
     button.addEventListener('click', downloadMemoryBackup)
   })
+  app.querySelectorAll('[data-tribute-tier]').forEach((button) => {
+    button.addEventListener('click', () => addTributeDraft(button.dataset.tributeTier))
+  })
   app
     .querySelector('[data-backup-import-input]')
     ?.addEventListener('change', handleBackupImportFile)
@@ -2762,6 +2856,36 @@ function handleGoogleLogout() {
       activeTab: state.activeTab,
     })
   }
+}
+
+function addTributeDraft(tierId) {
+  const tier = TRIBUTE_TIERS.find((item) => item.id === tierId)
+  if (!tier) return
+
+  const now = new Date()
+  const createdAt = now.toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+
+  setState((current) => ({
+    ...current,
+    tributeMessage:
+      '시범 꽃을 남겼습니다. 실제 결제와 정산은 아직 발생하지 않았습니다.',
+    tributes: [
+      {
+        id: `tr${now.getTime()}`,
+        tierId: tier.id,
+        tierLabel: tier.displayLabel,
+        giverName: '익명 방문자',
+        message: '따뜻한 마음을 남겼습니다.',
+        visibility: 'anonymous',
+        createdAt,
+      },
+      ...(current.tributes ?? []),
+    ],
+  }))
 }
 
 async function handleCreateMemorialForm(event) {
@@ -4588,6 +4712,7 @@ function downloadMemoryBackup() {
     timeline: state.timeline,
     moments: state.moments,
     guestbook: state.guestbook,
+    tributes: state.tributes ?? [],
     announcements: state.announcements,
     familyMembers: state.familyMembers,
     contentRevisions: state.contentRevisions,
@@ -4682,6 +4807,7 @@ function applyBackupImport() {
     timeline: backup.timeline,
     moments: backup.moments,
     guestbook: backup.guestbook,
+    tributes: backup.tributes,
     announcements: backup.announcements,
     familyMembers: backup.familyMembers,
     contentRevisions: backup.contentRevisions,
@@ -4728,6 +4854,7 @@ function normalizeMemoryBackup(value) {
     timeline: normalizeBackupTimeline(value.timeline),
     moments: normalizeBackupMoments(value.moments),
     guestbook: normalizeBackupGuestbook(value.guestbook),
+    tributes: normalizeBackupTributes(value.tributes),
     announcements: normalizeBackupAnnouncements(value.announcements),
     familyMembers: normalizeBackupFamilyMembers(value.familyMembers),
     contentRevisions: normalizeBackupContentRevisions(value.contentRevisions),
@@ -4774,6 +4901,28 @@ function normalizeBackupGuestbook(value) {
       message: stringOr(entry.message, ''),
       status: allowedValue(entry.status, ['pending', 'approved', 'hidden'], 'pending'),
       pinned: Boolean(entry.pinned),
+      createdAt: stringOr(entry.createdAt, ''),
+    }
+  })
+}
+
+function normalizeBackupTributes(value) {
+  return arrayOrEmpty(value).map((rawEntry, index) => {
+    const entry = objectOrEmpty(rawEntry)
+    const tierId = allowedValue(
+      entry.tierId,
+      TRIBUTE_TIERS.map((tier) => tier.id),
+      'small-flower',
+    )
+    const tier = TRIBUTE_TIERS.find((item) => item.id === tierId) ?? TRIBUTE_TIERS[0]
+
+    return {
+      id: stringOr(entry.id, `restore-tr${index + 1}`),
+      tierId,
+      tierLabel: stringOr(entry.tierLabel, tier.displayLabel),
+      giverName: stringOr(entry.giverName, '익명 방문자'),
+      message: stringOr(entry.message, '따뜻한 마음을 남겼습니다.'),
+      visibility: allowedValue(entry.visibility, ['public', 'anonymous', 'private'], 'anonymous'),
       createdAt: stringOr(entry.createdAt, ''),
     }
   })

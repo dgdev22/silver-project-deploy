@@ -752,6 +752,105 @@ h1 {
   margin-top: 18px;
 }
 
+.tribute-section {
+  border-color: var(--highlight);
+}
+
+.tribute-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.tribute-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.tribute-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.tribute-tier-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tribute-tier-card {
+  display: grid;
+  gap: 12px;
+  border: 2px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  padding: 14px;
+}
+
+.tribute-tier-card div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tribute-tier-card strong {
+  font-size: 1.08rem;
+}
+
+.tribute-tier-card span {
+  border-radius: 999px;
+  background: var(--highlight-soft);
+  color: var(--ink);
+  padding: 5px 9px;
+  font-weight: 1000;
+}
+
+.tribute-tier-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.tribute-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.tribute-entry {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 14px;
+}
+
+.tribute-entry strong {
+  color: var(--accent-strong);
+}
+
+.tribute-entry p {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 900;
+  line-height: 1.4;
+}
+
+.tribute-entry span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
 .guest-list,
 .owned-guestbook-list,
 .moderation-list,
@@ -1576,11 +1675,16 @@ textarea {
   .editor-layout,
   .announcement-list,
   .revision-diff,
-  .compact-grid {
+  .compact-grid,
+  .tribute-layout {
     grid-template-columns: 1fr;
   }
 
   .exhibition-preset-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tribute-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1627,6 +1731,11 @@ textarea {
   }
 
   .moment-gallery {
+    grid-template-columns: 1fr;
+  }
+
+  .tribute-tier-list,
+  .tribute-list {
     grid-template-columns: 1fr;
   }
 
