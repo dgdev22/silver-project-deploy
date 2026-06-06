@@ -694,16 +694,24 @@ function memoryCreateUrl() {
   return `${memoryBaseUrl()}#/new`
 }
 
+function memoryBusinessUrl() {
+  return `${memoryBaseUrl()}#/business`
+}
+
 function memoryBaseUrl() {
   const url = new URL(window.location.href)
 
   return `${url.origin}${url.pathname}`
 }
 
+function isBusinessRoute() {
+  return window.location.hash.startsWith('#/business')
+}
+
 function isCreateRoute() {
   const hasQuerySlug = Boolean(new URLSearchParams(window.location.search).get('slug'))
 
-  return window.location.hash.startsWith('#/new') || (!window.location.hash && !hasQuerySlug)
+  return !isBusinessRoute() && (window.location.hash.startsWith('#/new') || (!window.location.hash && !hasQuerySlug))
 }
 
 function currentMemorySlug() {
@@ -868,6 +876,28 @@ function currentEditorName() {
 function render() {
   applyDesignTheme()
 
+  if (isBusinessRoute()) {
+    app.innerHTML = `
+      <header class="app-header">
+        <a class="brand" href="${escapeHtml(memoryBusinessUrl())}" aria-label="Silver Memory 파트너 홈">
+          <span>Silver Memory</span>
+        </a>
+        <nav class="top-nav" aria-label="주요 메뉴">
+          ${navLink(memoryBusinessUrl(), '사업자 제휴', true)}
+          ${navLink(memoryPageUrlForSlug(DEFAULT_MEMORY_SLUG), '샘플 추모관', false)}
+          ${navLink(memoryCreateUrl(), '새 추모관', false)}
+        </nav>
+        <div class="storage-status is-live">QR 제휴</div>
+      </header>
+
+      <main class="business-main">
+        ${renderBusinessLanding()}
+      </main>
+    `
+    bindGlobalEvents()
+    return
+  }
+
   if (isCreateRoute()) {
     app.innerHTML = `
       <header class="app-header">
@@ -877,6 +907,7 @@ function render() {
         <nav class="top-nav" aria-label="주요 메뉴">
           ${navLink(memoryCreateUrl(), '새 추모관', true)}
           ${navLink(memoryPageUrlForSlug(DEFAULT_MEMORY_SLUG), '샘플 보기', false)}
+          ${navLink(memoryBusinessUrl(), '사업자 제휴', false)}
         </nav>
         ${renderMemoryUserControl()}
         <div class="storage-status is-live">운영 저장</div>
@@ -901,6 +932,7 @@ function render() {
         ${navButton('guestbook', '방명록')}
         ${navButton('editor', '유족 편집')}
         ${navLink(memoryCreateUrl(), '새 추모관', false)}
+        ${navLink(memoryBusinessUrl(), '사업자 제휴', false)}
       </nav>
       ${renderMemoryUserControl()}
       <div class="storage-status ${state.isApiBacked ? 'is-live' : 'is-local'}">
@@ -923,6 +955,120 @@ function render() {
   `
 
   bindGlobalEvents()
+}
+
+function renderBusinessLanding() {
+  return `
+    <section class="business-hero">
+      <div class="business-hero-copy">
+        <p class="eyebrow">장례식장 · 봉안당 · 추모공원 파트너십</p>
+        <h1>QR 하나로 장례 이후의 기억까지 이어갑니다</h1>
+        <p>
+          유족에게는 고인의 생애 페이지와 방명록을, 사업자에게는 차별화된 디지털 추모 서비스를 제공합니다.
+          인쇄 QR 카드부터 묘비 스티커, 유족 편집기까지 한 흐름으로 준비합니다.
+        </p>
+        <div class="button-row">
+          <a class="primary-link-button" href="${escapeHtml(memoryPageUrlForSlug(DEFAULT_MEMORY_SLUG))}">
+            샘플 추모관 보기
+          </a>
+          <a class="secondary-link-button" href="${escapeHtml(memoryCreateUrl())}">
+            파일럿 추모관 만들기
+          </a>
+        </div>
+      </div>
+      <div class="business-qr-showcase" aria-label="QR 추모관 예시">
+        <div class="business-card-stack">
+          <article class="business-qr-card">
+            <span>Silver Memory QR</span>
+            <strong>${escapeHtml(initialState.profile.name)}</strong>
+            <small>${escapeHtml(initialState.profile.years)}</small>
+            <div class="business-qr-box">
+              ${createQrSvg(memoryPageUrlForSlug(DEFAULT_MEMORY_SLUG), {
+                moduleSize: 4,
+                quiet: 3,
+                dark: currentDesignTheme().qrDark,
+              })}
+            </div>
+            <p>휴대폰 카메라로 비추면 생애 페이지와 방명록이 열립니다.</p>
+          </article>
+          <article class="business-mini-panel">
+            <strong>장례 이후에도 이어지는 방문</strong>
+            <span>QR 카드 · 유족 편집 · 방명록 · 백업</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="business-section">
+      <div class="section-title">
+        <p>사업자에게 필요한 이유</p>
+        <h2>장례식장의 경험을 디지털 추모까지 확장합니다</h2>
+      </div>
+      <div class="business-value-grid">
+        ${renderBusinessValue('유족 만족도', '종이 방명록 이후에도 가족과 지인이 추억을 남길 수 있습니다.')}
+        ${renderBusinessValue('차별화 상품', 'QR 추모 카드와 전시관 템플릿을 장례 패키지에 자연스럽게 포함할 수 있습니다.')}
+        ${renderBusinessValue('운영 편의', '유족 편집기, 공개 범위, 백업, QR 다운로드 흐름을 한 화면에서 제공합니다.')}
+        ${renderBusinessValue('반복 매출', '추모관 생성 건당 과금, 월 파트너 요금, 인쇄물 제작 마진을 분리할 수 있습니다.')}
+      </div>
+    </section>
+
+    <section class="business-section">
+      <div class="section-title">
+        <p>제휴 상품안</p>
+        <h2>작게 시작하고, 반응이 좋으면 패키지화합니다</h2>
+      </div>
+      <div class="business-package-grid">
+        ${renderBusinessPackage('파일럿', '상담 후 결정', ['샘플 추모관 생성', 'QR 카드 SVG 제공', '직원 안내 스크립트'])}
+        ${renderBusinessPackage('스탠다드', '월 파트너 요금', ['추모관 생성 건수 관리', '브랜드 안내 문구', '유족 편집 지원'])}
+        ${renderBusinessPackage('프리미엄', '맞춤 견적', ['봉안당/추모공원 QR 스티커', '관리자 대시보드', '데이터 백업/이관 지원'])}
+      </div>
+    </section>
+
+    <section class="business-section business-flow">
+      <div class="section-title">
+        <p>도입 흐름</p>
+        <h2>현장 업무를 크게 바꾸지 않고 붙입니다</h2>
+      </div>
+      <div class="business-flow-list">
+        ${renderBusinessStep('1', '유족 동의 후 추모관 생성')}
+        ${renderBusinessStep('2', 'QR 카드 또는 묘비 스티커 전달')}
+        ${renderBusinessStep('3', '방문자가 생애 페이지와 방명록 이용')}
+        ${renderBusinessStep('4', '유족이 편집/공개 범위/백업 관리')}
+      </div>
+    </section>
+  `
+}
+
+function renderBusinessValue(title, body) {
+  return `
+    <article class="business-value-card">
+      <h3>${escapeHtml(title)}</h3>
+      <p>${escapeHtml(body)}</p>
+    </article>
+  `
+}
+
+function renderBusinessPackage(title, price, items) {
+  return `
+    <article class="business-package-card">
+      <div>
+        <strong>${escapeHtml(title)}</strong>
+        <span>${escapeHtml(price)}</span>
+      </div>
+      <ul>
+        ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+      </ul>
+    </article>
+  `
+}
+
+function renderBusinessStep(number, label) {
+  return `
+    <article class="business-step">
+      <strong>${escapeHtml(number)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </article>
+  `
 }
 
 function renderPrivateMemorialNotice() {
