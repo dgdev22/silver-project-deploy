@@ -103,6 +103,44 @@ const PAGE_TEMPLATES = [
     description: '짧은 장면을 크게 넘겨보기',
   },
 ]
+const EXHIBITION_PRESETS = [
+  {
+    id: 'family-archive',
+    label: '따뜻한 가족 기록관',
+    kicker: '가족 중심',
+    description: '타임라인과 기억 카드를 균형 있게 보여주는 기본 전시관입니다.',
+    designTheme: 'warm',
+    pageTemplate: 'classic',
+    memorialKind: 'person',
+  },
+  {
+    id: 'photo-retrospective',
+    label: '사진 회고전',
+    kicker: '사진 중심',
+    description: '대표 사진과 여러 장면을 먼저 보여주며 삶의 분위기를 전합니다.',
+    designTheme: 'ocean',
+    pageTemplate: 'gallery',
+    memorialKind: 'person',
+  },
+  {
+    id: 'letter-memorial',
+    label: '편지 전시관',
+    kicker: '글과 마음',
+    description: '남겨진 말, 가족의 편지, 방명록을 차분하게 읽는 구성입니다.',
+    designTheme: 'paper',
+    pageTemplate: 'letter',
+    memorialKind: 'person',
+  },
+  {
+    id: 'pet-memory',
+    label: '반려동물 추억관',
+    kicker: '함께한 일상',
+    description: '산책, 장난감, 습관처럼 작고 소중한 장면을 앨범처럼 남깁니다.',
+    designTheme: 'garden',
+    pageTemplate: 'album',
+    memorialKind: 'pet',
+  },
+]
 const EDIT_ACTION_LABELS = {
   memorial_created: '생성',
   profile_updated: '프로필 수정',
@@ -1897,6 +1935,7 @@ function renderDesignEditorPanel() {
         <span>${escapeHtml(currentPageTemplate().label)}</span>
         <span>${escapeHtml(currentMemorialKind().label)}</span>
       </div>
+      ${renderExhibitionPresetPicker()}
       <div class="design-editor-grid">
         ${renderThemePicker()}
         ${renderTemplatePicker()}
@@ -2023,6 +2062,49 @@ function renderThemePicker() {
         ${DESIGN_THEMES.map(renderThemeChoice).join('')}
       </div>
     </div>
+  `
+}
+
+function renderExhibitionPresetPicker() {
+  return `
+    <div class="exhibition-preset-field">
+      <span class="field-label">전시관 템플릿</span>
+      <div class="exhibition-preset-grid" role="radiogroup" aria-label="전시관 템플릿">
+        ${EXHIBITION_PRESETS.map(renderExhibitionPresetChoice).join('')}
+      </div>
+    </div>
+  `
+}
+
+function renderExhibitionPresetChoice(preset) {
+  const theme = DESIGN_THEMES.find((item) => item.id === preset.designTheme) ?? currentDesignTheme()
+  const selected =
+    currentDesignTheme().id === preset.designTheme &&
+    currentPageTemplate().id === preset.pageTemplate &&
+    currentMemorialKind().id === preset.memorialKind
+  const templateLabel =
+    PAGE_TEMPLATES.find((template) => template.id === preset.pageTemplate)?.label ?? preset.pageTemplate
+  const kindLabel =
+    MEMORIAL_KINDS.find((kind) => kind.id === preset.memorialKind)?.label ?? preset.memorialKind
+
+  return `
+    <button
+      type="button"
+      class="exhibition-preset-card ${selected ? 'is-selected' : ''}"
+      data-exhibition-preset="${escapeHtml(preset.id)}"
+      role="radio"
+      aria-checked="${selected}"
+    >
+      <span class="preset-kicker">${escapeHtml(preset.kicker)}</span>
+      <strong>${escapeHtml(preset.label)}</strong>
+      <small>${escapeHtml(preset.description)}</small>
+      <span class="theme-swatch-row" aria-hidden="true">
+        ${theme.swatches
+          .map((color) => `<span class="theme-swatch" style="background: ${color}"></span>`)
+          .join('')}
+      </span>
+      <span class="preset-meta">${escapeHtml(templateLabel)} · ${escapeHtml(kindLabel)}</span>
+    </button>
   `
 }
 
@@ -2579,6 +2661,20 @@ function bindGlobalEvents() {
   app.querySelectorAll('[data-accept-tag]').forEach((button) => {
     button.addEventListener('click', () => {
       acceptSuggestedTags([button.dataset.acceptTag].filter(Boolean))
+    })
+  })
+  app.querySelectorAll('[data-exhibition-preset]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const preset = EXHIBITION_PRESETS.find((item) => item.id === button.dataset.exhibitionPreset)
+      if (!preset) return
+
+      setState((current) => ({
+        ...current,
+        profile: mergeProfileDraft(current),
+        designTheme: preset.designTheme,
+        pageTemplate: preset.pageTemplate,
+        memorialKind: preset.memorialKind,
+      }))
     })
   })
   app.querySelectorAll('[data-theme-choice]').forEach((button) => {
