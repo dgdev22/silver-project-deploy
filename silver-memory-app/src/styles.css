@@ -195,6 +195,7 @@ button:disabled {
   top: 0;
   z-index: 10;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   justify-content: space-between;
@@ -220,6 +221,7 @@ button:disabled {
 
 .top-nav {
   display: flex;
+  flex: 1 1 auto;
   gap: 8px;
   overflow-x: auto;
 }
@@ -244,6 +246,42 @@ button:disabled {
   color: var(--ink);
   padding: 0 16px;
   text-decoration: none;
+}
+
+.memory-user-control {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  padding: 6px;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.memory-user-control span {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.small-text-button {
+  min-height: 36px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 6px 10px;
+  font-weight: 900;
+}
+
+.small-text-button:focus-visible,
+.small-text-button:hover {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
 }
 
 .nav-button.is-active {

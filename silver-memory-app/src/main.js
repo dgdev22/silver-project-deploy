@@ -6,6 +6,11 @@ const API_BASE_URL =
 const DEFAULT_DESIGN_THEME = 'warm'
 const DEFAULT_MEMORIAL_KIND = 'person'
 const DEFAULT_PAGE_TEMPLATE = 'classic'
+const DEMO_GOOGLE_USER = {
+  userId: 'google-demo-visitor',
+  email: 'visitor@example.com',
+  displayName: 'Google 방문자',
+}
 const MAX_PROFILE_TAGS = 12
 const MAX_HERO_IMAGE_BYTES = 5 * 1024 * 1024
 const DESIGN_THEMES = [
@@ -114,6 +119,7 @@ const initialState = {
   inviteLink: '',
   editorInvites: [],
   ownedGuestbookEntries: [],
+  memoryUser: null,
   designTheme: DEFAULT_DESIGN_THEME,
   memorialKind: DEFAULT_MEMORIAL_KIND,
   pageTemplate: DEFAULT_PAGE_TEMPLATE,
@@ -302,6 +308,7 @@ async function apiRequest(path, options = {}) {
     headers: {
       'Content-Type': 'application/json',
       ...editorTokenHeader(),
+      ...memoryUserHeader(),
       ...(options.headers ?? {}),
     },
   })
@@ -335,6 +342,15 @@ function editorTokenHeader() {
 
 function guestbookOwnerHeader(ownerToken) {
   return ownerToken ? { 'X-Memory-Guestbook-Token': ownerToken } : {}
+}
+
+function memoryUserHeader() {
+  if (!state.memoryUser?.userId) return {}
+
+  return {
+    'X-Memory-User-Id': state.memoryUser.userId,
+    ...(state.memoryUser.email ? { 'X-Memory-User-Email': state.memoryUser.email } : {}),
+  }
 }
 
 async function loadFromApi({ includeModeration = false, activeTab } = {}) {
@@ -588,7 +604,7 @@ function visibleGuestbookEntries() {
 
 function ownedGuestbookEntries() {
   return (state.ownedGuestbookEntries ?? [])
-    .filter((entry) => entry.ownerToken && entry.status !== 'hidden')
+    .filter((entry) => canCurrentVisitorEditGuestbook(entry) && entry.status !== 'hidden')
     .sort(sortGuestbookEntriesDesc)
 }
 
@@ -607,19 +623,34 @@ function normalizeGuestbookEntry(entry, ownerToken = entry.ownerToken ?? '') {
     createdAt: formatDate(entry.createdAt),
     updatedAt: formatDate(entry.updatedAt ?? entry.createdAt),
     ownerToken,
+    ownedByCurrentUser: Boolean(entry.ownedByCurrentUser),
   }
 }
 
 function mergeOwnedGuestbookEntries(ownedEntries = [], serverEntries = []) {
   const serverById = new Map(serverEntries.map((entry) => [String(entry.id), entry]))
+  const mergedById = new Map()
 
-  return ownedEntries
-    .map((entry) => ({
+  ownedEntries.forEach((entry) => {
+    mergedById.set(String(entry.id), {
       ...entry,
       ...(serverById.get(String(entry.id)) ?? {}),
       ownerToken: entry.ownerToken,
-    }))
-    .filter((entry) => entry.ownerToken && entry.status !== 'hidden')
+    })
+  })
+  serverEntries
+    .filter((entry) => entry.ownedByCurrentUser)
+    .forEach((entry) => {
+      const previous = mergedById.get(String(entry.id))
+      mergedById.set(String(entry.id), {
+        ...entry,
+        ownerToken: previous?.ownerToken ?? entry.ownerToken ?? '',
+      })
+    })
+
+  return Array.from(mergedById.values()).filter(
+    (entry) => canCurrentVisitorEditGuestbook(entry) && entry.status !== 'hidden',
+  )
 }
 
 function guestbookStatusLabel(status) {
@@ -643,6 +674,10 @@ function sortGuestbookEntriesDesc(left, right) {
   return String(right.id).localeCompare(String(left.id))
 }
 
+function canCurrentVisitorEditGuestbook(entry) {
+  return Boolean(entry.ownerToken || entry.ownedByCurrentUser)
+}
+
 function currentEditorName() {
   const inputValue = app.querySelector('[data-editor-name]')?.value?.trim()
 
@@ -662,6 +697,7 @@ function render() {
           ${navLink(memoryCreateUrl(), '새 추모관', true)}
           ${navLink(memoryPageUrlForSlug(DEFAULT_MEMORY_SLUG), '샘플 보기', false)}
         </nav>
+        ${renderMemoryUserControl()}
         <div class="storage-status is-live">운영 저장</div>
       </header>
 
@@ -685,6 +721,7 @@ function render() {
         ${navButton('editor', '유족 편집')}
         ${navLink(memoryCreateUrl(), '새 추모관', false)}
       </nav>
+      ${renderMemoryUserControl()}
       <div class="storage-status ${state.isApiBacked ? 'is-live' : 'is-local'}">
         ${state.isApiBacked ? 'DB 저장 중' : '임시 저장'}
       </div>
@@ -727,6 +764,23 @@ function renderPrivateMemorialNotice() {
         </a>
       </div>
     </section>
+  `
+}
+
+function renderMemoryUserControl() {
+  if (state.memoryUser?.userId) {
+    return `
+      <div class="memory-user-control is-signed-in">
+        <span>${escapeHtml(state.memoryUser.displayName || state.memoryUser.email || '로그인 사용자')}</span>
+        <button type="button" class="small-text-button" data-google-logout>로그아웃</button>
+      </div>
+    `
+  }
+
+  return `
+    <div class="memory-user-control">
+      <button type="button" class="small-text-button" data-google-login>Google 로그인</button>
+    </div>
   `
 }
 
@@ -2001,6 +2055,8 @@ function bindGlobalEvents() {
     .querySelector('[data-create-memorial-form]')
     ?.addEventListener('submit', handleCreateMemorialForm)
   app.querySelector('[data-private-token-form]')?.addEventListener('submit', handlePrivateTokenForm)
+  app.querySelector('[data-google-login]')?.addEventListener('click', handleGoogleLogin)
+  app.querySelector('[data-google-logout]')?.addEventListener('click', handleGoogleLogout)
 
   app.querySelectorAll('[data-tab]').forEach((element) => {
     element.addEventListener('click', () => {
@@ -2150,6 +2206,37 @@ function bindGlobalEvents() {
   app.querySelectorAll('[data-pin]').forEach((button) => {
     button.addEventListener('click', () => toggleGuestPin(button.dataset.pin))
   })
+}
+
+function handleGoogleLogin() {
+  setState((current) => ({
+    ...current,
+    memoryUser: DEMO_GOOGLE_USER,
+    apiError: '',
+  }))
+
+  if (!isCreateRoute()) {
+    loadFromApi({
+      includeModeration: state.activeTab === 'editor' && Boolean(state.editorToken),
+      activeTab: state.activeTab,
+    })
+  }
+}
+
+function handleGoogleLogout() {
+  setState((current) => ({
+    ...current,
+    memoryUser: null,
+    ownedGuestbookEntries: current.ownedGuestbookEntries.filter((entry) => entry.ownerToken),
+    apiError: '',
+  }))
+
+  if (!isCreateRoute()) {
+    loadFromApi({
+      includeModeration: state.activeTab === 'editor' && Boolean(state.editorToken),
+      activeTab: state.activeTab,
+    })
+  }
 }
 
 async function handleCreateMemorialForm(event) {
