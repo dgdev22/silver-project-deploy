@@ -181,6 +181,7 @@ echo "PASS frontend"
 
 public_body="$(curl_body memory_public "${API_BASE_URL}/api/memory/memorials/${MEMORY_SLUG}" 200)"
 assert_contains "$public_body" "\"profile\"" "Public memory API should include profile"
+assert_contains "$public_body" "\"announcements\"" "Public memory API should include announcements"
 assert_contains "$public_body" "\"guestbook\"" "Public memory API should include guestbook"
 echo "PASS public API"
 
@@ -247,5 +248,21 @@ moment_patch_body="$(patch_json memory_moment_patch "${API_BASE_URL}/api/memory/
 assert_contains "$moment_patch_body" "\"title\":\"Smoke Test Moment Updated\"" "Smoke moment should be updated"
 delete_json memory_moment_delete "${API_BASE_URL}/api/memory/moments/${moment_id}" 204 "{\"editorName\":\"운영 점검\"}" >/dev/null
 echo "PASS moment write/update/delete"
+
+announcement_body="$(post_json memory_announcement "${API_BASE_URL}/api/memory/memorials/${MEMORY_SLUG}/announcements" 201 "{\"title\":\"Smoke Test Notice\",\"body\":\"운영 점검용 공지 ${timestamp}\",\"announcementType\":\"notice\",\"pinned\":false,\"editorName\":\"운영 점검\"}")"
+assert_contains "$announcement_body" "\"title\":\"Smoke Test Notice\"" "Smoke announcement should be created"
+announcement_id="$(sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p' "$announcement_body" | head -n 1)"
+
+if [ -z "$announcement_id" ]; then
+  echo "FAIL: Could not find announcement id in response" >&2
+  sed -n '1,80p' "$announcement_body" >&2
+  exit 1
+fi
+
+announcement_patch_body="$(patch_json memory_announcement_patch "${API_BASE_URL}/api/memory/announcements/${announcement_id}" 200 "{\"title\":\"Smoke Test Notice Updated\",\"body\":\"운영 점검용 공지 수정 ${timestamp}\",\"announcementType\":\"update\",\"pinned\":true,\"editorName\":\"운영 점검\"}")"
+assert_contains "$announcement_patch_body" "\"title\":\"Smoke Test Notice Updated\"" "Smoke announcement should be updated"
+assert_contains "$announcement_patch_body" "\"announcementType\":\"update\"" "Smoke announcement type should be updated"
+delete_json memory_announcement_delete "${API_BASE_URL}/api/memory/announcements/${announcement_id}" 204 "{\"editorName\":\"운영 점검\"}" >/dev/null
+echo "PASS announcement write/update/delete"
 
 echo "Memory smoke test complete."

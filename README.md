@@ -26,13 +26,13 @@ docker compose --env-file .env.prod -f compose.prod.yaml up -d postgres backend 
 
 ## Smoke Tests
 
-Silver Memory 배포 후 읽기 전용 점검:
+Silver Memory 배포 후 읽기 전용 점검. 프론트 HTML, 공개 API, `announcements` 응답 계약, 유족 보호 상태를 확인합니다.
 
 ```bash
 ./scripts/smoke-memory.sh https://silver.loopmateapp.com
 ```
 
-유족 코드까지 포함한 쓰기 점검은 운영 DB에 점검용 방명록을 만든 뒤 바로 숨김 처리합니다.
+유족 코드까지 포함한 쓰기 점검은 운영 DB에 점검용 방명록, 타임라인, 기억 카드, 공지사항을 만든 뒤 바로 숨김 또는 삭제 처리합니다.
 
 ```bash
 SILVER_MEMORY_SMOKE_WRITE=1 \
