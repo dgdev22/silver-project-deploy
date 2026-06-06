@@ -113,6 +113,7 @@ const initialState = {
   backupImportMessage: '',
   inviteLink: '',
   editorInvites: [],
+  ownedGuestbookEntries: [],
   designTheme: DEFAULT_DESIGN_THEME,
   memorialKind: DEFAULT_MEMORIAL_KIND,
   pageTemplate: DEFAULT_PAGE_TEMPLATE,
@@ -332,6 +333,10 @@ function editorTokenHeader() {
   return state.editorToken ? { 'X-Memory-Editor-Token': state.editorToken } : {}
 }
 
+function guestbookOwnerHeader(ownerToken) {
+  return ownerToken ? { 'X-Memory-Guestbook-Token': ownerToken } : {}
+}
+
 async function loadFromApi({ includeModeration = false, activeTab } = {}) {
   setState((current) => ({
     ...current,
@@ -394,9 +399,28 @@ async function runApiAction(action) {
   }
 }
 
+async function runGuestbookOwnerAction(action) {
+  try {
+    await action()
+    return true
+  } catch (error) {
+    setState((current) => ({
+      ...current,
+      apiError:
+        error.status === 403
+          ? '이 브라우저에서 작성한 방명록만 수정하거나 삭제할 수 있습니다.'
+          : error.status === 429
+            ? '짧은 시간에 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.'
+            : '방명록을 저장하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+    }))
+    return false
+  }
+}
+
 function normalizeApiMemorial(data, current = state) {
   const { profile, timeline, moments, guestbook, editorInvites, editHistory } = data
   const currentEditorLabel = data.currentEditorLabel ?? ''
+  const normalizedGuestbook = guestbook.map((entry) => normalizeGuestbookEntry(entry))
 
   return {
     designTheme: profile.designTheme ?? DEFAULT_DESIGN_THEME,
@@ -435,15 +459,8 @@ function normalizeApiMemorial(data, current = state) {
       tag: item.tag ?? '기억',
       mediaUrl: item.mediaUrl ?? '',
     })),
-    guestbook: guestbook.map((entry) => ({
-      id: String(entry.id),
-      author: entry.author,
-      relation: entry.relation ?? '',
-      message: entry.message,
-      status: entry.status,
-      pinned: entry.pinned,
-      createdAt: formatDate(entry.createdAt),
-    })),
+    guestbook: normalizedGuestbook,
+    ownedGuestbookEntries: mergeOwnedGuestbookEntries(current.ownedGuestbookEntries, normalizedGuestbook),
     editorInvites: (editorInvites ?? []).map((invite) => ({
       id: String(invite.id),
       inviteeLabel: invite.inviteeLabel ?? '가족',
@@ -569,8 +586,61 @@ function visibleGuestbookEntries() {
     .sort((left, right) => Number(right.pinned) - Number(left.pinned))
 }
 
+function ownedGuestbookEntries() {
+  return (state.ownedGuestbookEntries ?? [])
+    .filter((entry) => entry.ownerToken && entry.status !== 'hidden')
+    .sort(sortGuestbookEntriesDesc)
+}
+
 function pendingGuestbookEntries() {
   return state.guestbook.filter((entry) => entry.status === 'pending')
+}
+
+function normalizeGuestbookEntry(entry, ownerToken = entry.ownerToken ?? '') {
+  return {
+    id: String(entry.id),
+    author: entry.author,
+    relation: entry.relation ?? '',
+    message: entry.message,
+    status: entry.status,
+    pinned: Boolean(entry.pinned),
+    createdAt: formatDate(entry.createdAt),
+    updatedAt: formatDate(entry.updatedAt ?? entry.createdAt),
+    ownerToken,
+  }
+}
+
+function mergeOwnedGuestbookEntries(ownedEntries = [], serverEntries = []) {
+  const serverById = new Map(serverEntries.map((entry) => [String(entry.id), entry]))
+
+  return ownedEntries
+    .map((entry) => ({
+      ...entry,
+      ...(serverById.get(String(entry.id)) ?? {}),
+      ownerToken: entry.ownerToken,
+    }))
+    .filter((entry) => entry.ownerToken && entry.status !== 'hidden')
+}
+
+function guestbookStatusLabel(status) {
+  const labels = {
+    pending: '승인 대기',
+    approved: '공개 중',
+    hidden: '숨김',
+  }
+
+  return labels[status] ?? '승인 대기'
+}
+
+function sortGuestbookEntriesDesc(left, right) {
+  const leftId = Number(left.id)
+  const rightId = Number(right.id)
+
+  if (Number.isFinite(leftId) && Number.isFinite(rightId)) {
+    return rightId - leftId
+  }
+
+  return String(right.id).localeCompare(String(left.id))
 }
 
 function currentEditorName() {
@@ -1048,6 +1118,7 @@ function renderStoryCard() {
 
 function renderGuestbook() {
   const approvedEntries = visibleGuestbookEntries()
+  const ownedEntries = ownedGuestbookEntries()
 
   return `
     <section class="guestbook-layout">
@@ -1072,6 +1143,17 @@ function renderGuestbook() {
           <button type="submit" class="primary-button">방명록 남기기</button>
           <p class="form-note">남긴 글은 유족 승인 후 공개됩니다.</p>
         </form>
+        ${
+          ownedEntries.length
+            ? `<div class="owned-guestbook-list">
+                <div class="section-title compact-title">
+                  <p>내가 남긴 방명록</p>
+                  <h3>이 브라우저에서 작성한 글</h3>
+                </div>
+                ${ownedEntries.map(renderOwnedGuestEntry).join('')}
+              </div>`
+            : ''
+        }
       </div>
 
       <div class="panel">
@@ -1097,6 +1179,34 @@ function renderGuestEntry(entry) {
       <p>${escapeHtml(entry.message)}</p>
       <small>${entry.pinned ? '고정된 글 · ' : ''}${escapeHtml(entry.createdAt)}</small>
     </article>
+  `
+}
+
+function renderOwnedGuestEntry(entry) {
+  return `
+    <form class="owned-guest-entry" data-owned-guest-form="${escapeHtml(entry.id)}">
+      <div class="owned-guest-heading">
+        <strong>${escapeHtml(guestbookStatusLabel(entry.status))}</strong>
+        <small>${escapeHtml(entry.updatedAt || entry.createdAt)}</small>
+      </div>
+      <label>
+        이름
+        <input name="author" required value="${escapeHtml(entry.author)}" />
+      </label>
+      <label>
+        관계
+        <input name="relation" value="${escapeHtml(entry.relation || '')}" />
+      </label>
+      <label>
+        남긴 말
+        <textarea name="message" required rows="4">${escapeHtml(entry.message)}</textarea>
+      </label>
+      <div class="button-row">
+        <button type="submit" class="secondary-button">수정</button>
+        <button type="button" class="danger-button" data-delete-owned-guest="${escapeHtml(entry.id)}">삭제</button>
+      </div>
+      <p class="form-note">수정한 글은 다시 유족 승인 후 공개됩니다.</p>
+    </form>
   `
 }
 
@@ -1718,7 +1828,7 @@ function renderModerationEntry(entry) {
     <article class="moderation-entry">
       <div>
         <strong>${escapeHtml(entry.author)}</strong>
-        <span>${escapeHtml(entry.status === 'approved' ? '공개 중' : '승인 대기')}</span>
+        <span>${escapeHtml(guestbookStatusLabel(entry.status))}</span>
       </div>
       <p>${escapeHtml(entry.message)}</p>
       <div class="button-row">
@@ -1862,6 +1972,8 @@ function editActionLabel(actionType) {
     editor_invite_created: '가족 초대',
     editor_invite_revoked: '초대 회수',
     guestbook_moderated: '방명록 관리',
+    guestbook_author_updated: '방명록 직접 수정',
+    guestbook_author_deleted: '방명록 직접 삭제',
     backup_restored: '백업 복구',
   }
 
@@ -1923,6 +2035,9 @@ function bindGlobalEvents() {
   })
 
   app.querySelector('[data-guest-form]')?.addEventListener('submit', handleGuestForm)
+  app.querySelectorAll('[data-owned-guest-form]').forEach((form) => {
+    form.addEventListener('submit', handleOwnedGuestEditForm)
+  })
   app.querySelector('[data-profile-form]')?.addEventListener('submit', handleProfileForm)
   app.querySelector('[data-hero-image-input]')?.addEventListener('change', handleHeroImagePreview)
   app.querySelector('[data-quick-record-form]')?.addEventListener('submit', handleQuickRecordForm)
@@ -1958,6 +2073,9 @@ function bindGlobalEvents() {
   })
   app.querySelectorAll('[data-delete-moment]').forEach((button) => {
     button.addEventListener('click', () => deleteMoment(button.dataset.deleteMoment))
+  })
+  app.querySelectorAll('[data-delete-owned-guest]').forEach((button) => {
+    button.addEventListener('click', () => deleteOwnedGuestEntry(button.dataset.deleteOwnedGuest))
   })
   app.querySelector('[data-generate-tags]')?.addEventListener('click', () => {
     setState((current) => {
@@ -2175,11 +2293,18 @@ async function handleGuestForm(event) {
 
   if (state.isApiBacked) {
     const ok = await runApiAction(async () => {
-      await apiRequest(`/api/memory/memorials/${currentMemorySlug()}/guestbook`, {
+      const entry = await apiRequest(`/api/memory/memorials/${currentMemorySlug()}/guestbook`, {
         method: 'POST',
         body: JSON.stringify(payload),
       })
-      await loadFromApi({ activeTab: 'guestbook' })
+      const ownedEntry = normalizeGuestbookEntry(entry, entry.ownerToken)
+
+      setState((current) => ({
+        ...current,
+        activeTab: 'guestbook',
+        ownedGuestbookEntries: upsertOwnedGuestbookEntry(current.ownedGuestbookEntries, ownedEntry),
+      }))
+      event.currentTarget.reset()
     })
     if (!ok) return
     return
@@ -2190,7 +2315,13 @@ async function handleGuestForm(event) {
     ...payload,
     status: 'pending',
     pinned: false,
+    ownerToken: `local-${Date.now()}`,
     createdAt: new Date().toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }),
+    updatedAt: new Date().toLocaleDateString('ko-KR', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -2201,7 +2332,104 @@ async function handleGuestForm(event) {
     ...current,
     activeTab: 'guestbook',
     guestbook: [entry, ...current.guestbook],
+    ownedGuestbookEntries: upsertOwnedGuestbookEntry(current.ownedGuestbookEntries, entry),
   }))
+  event.currentTarget.reset()
+}
+
+async function handleOwnedGuestEditForm(event) {
+  event.preventDefault()
+  const form = event.currentTarget
+  const id = form.dataset.ownedGuestForm
+  const ownedEntry = findOwnedGuestbookEntry(id)
+  if (!ownedEntry) return
+
+  const formData = new FormData(form)
+  const payload = {
+    author: formText(formData, 'author'),
+    relation: formText(formData, 'relation'),
+    message: formText(formData, 'message'),
+  }
+
+  if (state.isApiBacked) {
+    const ok = await runGuestbookOwnerAction(async () => {
+      const updated = await apiRequest(`/api/memory/guestbook/${id}/owner`, {
+        method: 'PATCH',
+        headers: guestbookOwnerHeader(ownedEntry.ownerToken),
+        body: JSON.stringify(payload),
+      })
+      const updatedEntry = normalizeGuestbookEntry(updated, ownedEntry.ownerToken)
+
+      setState((current) => ({
+        ...current,
+        guestbook: current.guestbook.map((entry) =>
+          String(entry.id) === String(id) ? updatedEntry : entry,
+        ),
+        ownedGuestbookEntries: upsertOwnedGuestbookEntry(current.ownedGuestbookEntries, updatedEntry),
+      }))
+    })
+    if (!ok) return
+    return
+  }
+
+  const updatedEntry = {
+    ...ownedEntry,
+    ...payload,
+    status: 'pending',
+    pinned: false,
+    updatedAt: new Date().toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }),
+  }
+
+  setState((current) => ({
+    ...current,
+    guestbook: current.guestbook.map((entry) =>
+      String(entry.id) === String(id) ? updatedEntry : entry,
+    ),
+    ownedGuestbookEntries: upsertOwnedGuestbookEntry(current.ownedGuestbookEntries, updatedEntry),
+  }))
+}
+
+async function deleteOwnedGuestEntry(id) {
+  const ownedEntry = findOwnedGuestbookEntry(id)
+  if (!ownedEntry || !window.confirm('내가 남긴 방명록을 삭제할까요?')) return
+
+  if (state.isApiBacked) {
+    const ok = await runGuestbookOwnerAction(async () => {
+      await apiRequest(`/api/memory/guestbook/${id}/owner`, {
+        method: 'DELETE',
+        headers: guestbookOwnerHeader(ownedEntry.ownerToken),
+      })
+      setState((current) => removeOwnedGuestbookEntry(current, id))
+    })
+    if (!ok) return
+    return
+  }
+
+  setState((current) => removeOwnedGuestbookEntry(current, id))
+}
+
+function findOwnedGuestbookEntry(id) {
+  return (state.ownedGuestbookEntries ?? []).find((entry) => String(entry.id) === String(id))
+}
+
+function upsertOwnedGuestbookEntry(entries = [], nextEntry) {
+  const filtered = entries.filter((entry) => String(entry.id) !== String(nextEntry.id))
+
+  return [nextEntry, ...filtered]
+}
+
+function removeOwnedGuestbookEntry(current, id) {
+  return {
+    ...current,
+    guestbook: current.guestbook.filter((entry) => String(entry.id) !== String(id)),
+    ownedGuestbookEntries: (current.ownedGuestbookEntries ?? []).filter(
+      (entry) => String(entry.id) !== String(id),
+    ),
+  }
 }
 
 async function handleProfileForm(event) {

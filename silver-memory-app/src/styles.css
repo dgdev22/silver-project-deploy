@@ -629,6 +629,7 @@ h1 {
 }
 
 .guest-list,
+.owned-guestbook-list,
 .moderation-list,
 .edit-history-list,
 .invite-list,
@@ -639,6 +640,7 @@ h1 {
 }
 
 .guest-entry,
+.owned-guest-entry,
 .moderation-entry,
 .edit-history-entry,
 .invite-entry,
@@ -657,6 +659,43 @@ h1 {
 .guest-entry.is-pinned {
   border-color: var(--highlight);
   background: var(--highlight-soft);
+}
+
+.owned-guestbook-list {
+  margin-top: 22px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+
+.compact-title {
+  margin-bottom: 4px;
+}
+
+.compact-title h3 {
+  margin: 0;
+  font-size: 1.16rem;
+}
+
+.owned-guest-entry {
+  display: grid;
+  gap: 12px;
+}
+
+.owned-guest-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.owned-guest-heading strong {
+  color: var(--accent-strong);
+}
+
+.owned-guest-heading small {
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .guest-entry div,
