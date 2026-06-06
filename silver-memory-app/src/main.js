@@ -119,6 +119,7 @@ const initialState = {
   inviteLink: '',
   editorInvites: [],
   familyMembers: [],
+  contentRevisions: [],
   ownedGuestbookEntries: [],
   memoryUser: null,
   designTheme: DEFAULT_DESIGN_THEME,
@@ -446,7 +447,7 @@ async function runGuestbookOwnerAction(action) {
 }
 
 function normalizeApiMemorial(data, current = state) {
-  const { profile, timeline, moments, guestbook, announcements, editorInvites, familyMembers, editHistory } = data
+  const { profile, timeline, moments, guestbook, announcements, editorInvites, familyMembers, editHistory, contentRevisions } = data
   const currentEditorLabel = data.currentEditorLabel ?? ''
   const normalizedGuestbook = guestbook.map((entry) => normalizeGuestbookEntry(entry))
 
@@ -508,6 +509,7 @@ function normalizeApiMemorial(data, current = state) {
       summary: event.summary,
       createdAt: formatDateTime(event.createdAt),
     })),
+    contentRevisions: (contentRevisions ?? []).map(normalizeContentRevision),
   }
 }
 
@@ -663,6 +665,20 @@ function normalizeFamilyMember(member) {
     status: member.status ?? 'active',
     createdAt: formatDateTime(member.createdAt),
     updatedAt: formatDateTime(member.updatedAt),
+  }
+}
+
+function normalizeContentRevision(revision) {
+  return {
+    id: String(revision.id),
+    editEventId: revision.editEventId ? String(revision.editEventId) : '',
+    editorName: revision.editorName ?? '유족',
+    actionType: revision.actionType ?? '',
+    targetType: revision.targetType ?? '',
+    targetId: revision.targetId ? String(revision.targetId) : '',
+    beforeSnapshot: revision.beforeSnapshot ?? '',
+    afterSnapshot: revision.afterSnapshot ?? '',
+    createdAt: formatDateTime(revision.createdAt),
   }
 }
 
@@ -1559,6 +1575,19 @@ function renderEditor() {
           ${state.editHistory.length ? state.editHistory.map(renderEditHistoryEntry).join('') : '<p class="empty-text">아직 편집 기록이 없습니다.</p>'}
         </div>
       </div>
+
+      <div class="panel editor-wide revision-panel">
+        <div class="section-title">
+          <p>버전 상세</p>
+          <h2>변경 전후 스냅샷</h2>
+        </div>
+        <p class="form-note">
+          유족 협업 중 문제가 생기면 이 기록을 기준으로 어느 내용이 어떻게 바뀌었는지 확인할 수 있습니다.
+        </p>
+        <div class="revision-list">
+          ${state.contentRevisions.length ? state.contentRevisions.map(renderContentRevisionEntry).join('') : '<p class="empty-text">아직 저장된 버전 상세가 없습니다.</p>'}
+        </div>
+      </div>
     </section>
   `
 }
@@ -1642,7 +1671,7 @@ function renderBackupImportPreview() {
     <div class="backup-import-preview">
       <strong>${escapeHtml(backup.profile.name || '이름 없음')}</strong>
       <p>
-        타임라인 ${backup.timeline.length.toLocaleString('ko-KR')}개 · 기억 카드 ${backup.moments.length.toLocaleString('ko-KR')}개 · 방명록 ${backup.guestbook.length.toLocaleString('ko-KR')}개 · 공지 ${backup.announcements.length.toLocaleString('ko-KR')}개 · 가족 권한 ${backup.familyMembers.length.toLocaleString('ko-KR')}개
+        타임라인 ${backup.timeline.length.toLocaleString('ko-KR')}개 · 기억 카드 ${backup.moments.length.toLocaleString('ko-KR')}개 · 방명록 ${backup.guestbook.length.toLocaleString('ko-KR')}개 · 공지 ${backup.announcements.length.toLocaleString('ko-KR')}개 · 가족 권한 ${backup.familyMembers.length.toLocaleString('ko-KR')}개 · 버전 ${backup.contentRevisions.length.toLocaleString('ko-KR')}개
       </p>
       <p class="form-note">
         내보낸 시각: ${escapeHtml(formatDateTime(backup.exportedAt) || backup.exportedAt || '-')}
@@ -2279,6 +2308,124 @@ function renderEditHistoryEntry(event) {
       <small>${escapeHtml(event.createdAt)}</small>
     </article>
   `
+}
+
+function renderContentRevisionEntry(revision) {
+  return `
+    <article class="revision-entry">
+      <div class="revision-heading">
+        <div>
+          <strong>${escapeHtml(editActionLabel(revision.actionType))}</strong>
+          <span>${escapeHtml(targetTypeLabel(revision.targetType))}${revision.targetId ? ` #${escapeHtml(revision.targetId)}` : ''}</span>
+        </div>
+        <small>${escapeHtml(revision.editorName || '유족')} · ${escapeHtml(revision.createdAt)}</small>
+      </div>
+      <div class="revision-diff">
+        <div>
+          <h3>변경 전</h3>
+          ${renderRevisionSnapshot(revision.beforeSnapshot, '이전에 없던 항목입니다.')}
+        </div>
+        <div>
+          <h3>변경 후</h3>
+          ${renderRevisionSnapshot(revision.afterSnapshot, '삭제되어 현재 내용이 없습니다.')}
+        </div>
+      </div>
+    </article>
+  `
+}
+
+function targetTypeLabel(targetType) {
+  const labels = {
+    memorial: '생애 페이지',
+    life_event: '타임라인',
+    moment: '기억 카드',
+    announcement: '공지사항',
+    guestbook: '방명록',
+    family_member: '가족 권한',
+    editor_invite: '가족 초대',
+  }
+
+  return labels[targetType] ?? targetType ?? '항목'
+}
+
+function renderRevisionSnapshot(snapshotText, emptyMessage) {
+  if (!snapshotText) {
+    return `<p class="empty-text">${escapeHtml(emptyMessage)}</p>`
+  }
+
+  const snapshot = parseSnapshot(snapshotText)
+  if (!snapshot) {
+    return `<p class="snapshot-raw">${escapeHtml(snapshotText).slice(0, 360)}</p>`
+  }
+
+  const entries = Object.entries(snapshot)
+    .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== '')
+    .slice(0, 8)
+
+  if (!entries.length) {
+    return '<p class="empty-text">표시할 주요 필드가 없습니다.</p>'
+  }
+
+  return `
+    <dl class="snapshot-fields">
+      ${entries.map(([key, value]) => `
+        <div>
+          <dt>${escapeHtml(snapshotFieldLabel(key))}</dt>
+          <dd>${escapeHtml(snapshotValue(value))}</dd>
+        </div>
+      `).join('')}
+    </dl>
+  `
+}
+
+function parseSnapshot(snapshotText) {
+  try {
+    const parsed = JSON.parse(snapshotText)
+
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function snapshotFieldLabel(key) {
+  const labels = {
+    displayName: '이름',
+    years: '생몰연도',
+    subtitle: '소개',
+    location: '지역',
+    visibility: '공개 범위',
+    heroImageUrl: '대표 사진',
+    tags: '태그',
+    designTheme: '테마',
+    memorialKind: '기억 대상',
+    pageTemplate: '구성',
+    eventYear: '시기',
+    title: '제목',
+    body: '내용',
+    sortOrder: '정렬',
+    tag: '분류',
+    mediaUrl: '미디어',
+    announcementType: '공지 유형',
+    pinned: '고정',
+    author: '작성자',
+    relation: '관계',
+    message: '메시지',
+    status: '상태',
+    updatedAt: '수정 시각',
+    moderatedAt: '검수 시각',
+    deletedAt: '삭제 시각',
+  }
+
+  return labels[key] ?? key
+}
+
+function snapshotValue(value) {
+  if (Array.isArray(value)) return value.join(', ')
+  if (typeof value === 'boolean') return value ? '예' : '아니오'
+  if (typeof value === 'object' && value !== null) return JSON.stringify(value)
+
+  return String(value)
 }
 
 function editActionLabel(actionType) {
@@ -4350,6 +4497,7 @@ function downloadMemoryBackup() {
     guestbook: state.guestbook,
     announcements: state.announcements,
     familyMembers: state.familyMembers,
+    contentRevisions: state.contentRevisions,
     editorInvites: state.editorInvites.map((invite) => ({
       id: invite.id,
       inviteeLabel: invite.inviteeLabel,
@@ -4443,6 +4591,7 @@ function applyBackupImport() {
     guestbook: backup.guestbook,
     announcements: backup.announcements,
     familyMembers: backup.familyMembers,
+    contentRevisions: backup.contentRevisions,
     editorInvites: backup.editorInvites,
     editHistory: [
       buildLocalEditEvent('backup_restored', '백업 파일을 이 브라우저에 임시 복구했습니다.'),
@@ -4488,6 +4637,7 @@ function normalizeMemoryBackup(value) {
     guestbook: normalizeBackupGuestbook(value.guestbook),
     announcements: normalizeBackupAnnouncements(value.announcements),
     familyMembers: normalizeBackupFamilyMembers(value.familyMembers),
+    contentRevisions: normalizeBackupContentRevisions(value.contentRevisions),
     editorInvites: normalizeBackupInvites(value.editorInvites),
     editHistory: normalizeBackupEditHistory(value.editHistory),
   }
@@ -4567,6 +4717,24 @@ function normalizeBackupFamilyMembers(value) {
       updatedAt: stringOr(member.updatedAt, ''),
     }
   }).filter((member) => member.userId)
+}
+
+function normalizeBackupContentRevisions(value) {
+  return arrayOrEmpty(value).map((rawRevision, index) => {
+    const revision = objectOrEmpty(rawRevision)
+
+    return {
+      id: stringOr(revision.id, `restore-r${index + 1}`),
+      editEventId: stringOr(revision.editEventId, ''),
+      editorName: stringOr(revision.editorName, '유족'),
+      actionType: stringOr(revision.actionType, 'revision_imported'),
+      targetType: stringOr(revision.targetType, 'memorial'),
+      targetId: stringOr(revision.targetId, ''),
+      beforeSnapshot: stringOr(revision.beforeSnapshot, ''),
+      afterSnapshot: stringOr(revision.afterSnapshot, ''),
+      createdAt: stringOr(revision.createdAt, ''),
+    }
+  })
 }
 
 function normalizeBackupInvites(value) {

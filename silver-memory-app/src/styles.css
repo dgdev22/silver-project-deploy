@@ -756,6 +756,7 @@ h1 {
 .owned-guestbook-list,
 .moderation-list,
 .edit-history-list,
+.revision-list,
 .invite-list,
 .family-member-list,
 .memory-edit-list,
@@ -769,6 +770,7 @@ h1 {
 .owned-guest-entry,
 .moderation-entry,
 .edit-history-entry,
+.revision-entry,
 .invite-entry,
 .family-member-entry,
 .memory-edit-entry,
@@ -867,6 +869,86 @@ h1 {
 
 .edit-history-entry {
   background: var(--surface-raised);
+}
+
+.revision-entry {
+  display: grid;
+  gap: 14px;
+}
+
+.revision-heading,
+.revision-heading div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.revision-heading strong {
+  color: var(--brand-ink);
+  font-size: 1.1rem;
+}
+
+.revision-heading span,
+.revision-heading small {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.revision-diff {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.revision-diff > div {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 14px;
+}
+
+.revision-diff h3 {
+  margin: 0 0 10px;
+  color: var(--brand-ink);
+  font-size: 1.02rem;
+}
+
+.snapshot-fields {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.snapshot-fields div {
+  display: grid;
+  gap: 3px;
+}
+
+.snapshot-fields dt {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.snapshot-fields dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.snapshot-raw {
+  max-height: 180px;
+  overflow: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 0.9rem;
 }
 
 .edit-history-entry p {
@@ -1436,6 +1518,7 @@ textarea {
   .guestbook-layout,
   .editor-layout,
   .announcement-list,
+  .revision-diff,
   .compact-grid {
     grid-template-columns: 1fr;
   }
