@@ -183,6 +183,7 @@ public_body="$(curl_body memory_public "${API_BASE_URL}/api/memory/memorials/${M
 assert_contains "$public_body" "\"profile\"" "Public memory API should include profile"
 assert_contains "$public_body" "\"announcements\"" "Public memory API should include announcements"
 assert_contains "$public_body" "\"familyMembers\"" "Public memory API should include familyMembers"
+assert_contains "$public_body" "\"contentRevisions\"" "Public memory API should include contentRevisions"
 assert_contains "$public_body" "\"guestbook\"" "Public memory API should include guestbook"
 echo "PASS public API"
 
