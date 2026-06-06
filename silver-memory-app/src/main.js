@@ -211,6 +211,17 @@ const initialState = {
       createdAt: '2026.06.01',
     },
   ],
+  announcements: [
+    {
+      id: 'a1',
+      title: '추모관에 오신 분들께',
+      body: '가족이 함께 생애 기록을 정리하고 있습니다. 남기고 싶은 이야기는 방명록에 편하게 적어주세요.',
+      announcementType: 'notice',
+      pinned: true,
+      createdAt: '2026.06.01',
+      updatedAt: '2026.06.01',
+    },
+  ],
   editHistory: [
     {
       id: 'e1',
@@ -434,7 +445,7 @@ async function runGuestbookOwnerAction(action) {
 }
 
 function normalizeApiMemorial(data, current = state) {
-  const { profile, timeline, moments, guestbook, editorInvites, editHistory } = data
+  const { profile, timeline, moments, guestbook, announcements, editorInvites, editHistory } = data
   const currentEditorLabel = data.currentEditorLabel ?? ''
   const normalizedGuestbook = guestbook.map((entry) => normalizeGuestbookEntry(entry))
 
@@ -477,6 +488,7 @@ function normalizeApiMemorial(data, current = state) {
     })),
     guestbook: normalizedGuestbook,
     ownedGuestbookEntries: mergeOwnedGuestbookEntries(current.ownedGuestbookEntries, normalizedGuestbook),
+    announcements: (announcements ?? []).map(normalizeAnnouncement),
     editorInvites: (editorInvites ?? []).map((invite) => ({
       id: String(invite.id),
       inviteeLabel: invite.inviteeLabel ?? '가족',
@@ -627,6 +639,18 @@ function normalizeGuestbookEntry(entry, ownerToken = entry.ownerToken ?? '') {
   }
 }
 
+function normalizeAnnouncement(item) {
+  return {
+    id: String(item.id),
+    title: item.title,
+    body: item.body,
+    announcementType: item.announcementType ?? 'notice',
+    pinned: Boolean(item.pinned),
+    createdAt: formatDate(item.createdAt),
+    updatedAt: formatDate(item.updatedAt ?? item.createdAt),
+  }
+}
+
 function mergeOwnedGuestbookEntries(ownedEntries = [], serverEntries = []) {
   const serverById = new Map(serverEntries.map((entry) => [String(entry.id), entry]))
   const mergedById = new Map()
@@ -734,6 +758,7 @@ function render() {
           ? renderPrivateMemorialNotice()
           : `
             ${renderHero()}
+            ${renderAnnouncementBoard()}
             ${renderActiveTab()}
           `
       }
@@ -899,6 +924,57 @@ function renderHero() {
       </aside>
     </section>
   `
+}
+
+function renderAnnouncementBoard() {
+  const announcements = sortedAnnouncements()
+
+  if (!announcements.length) return ''
+
+  return `
+    <section class="announcement-board" aria-label="추모관 공지사항">
+      <div class="announcement-board-heading">
+        <p>알림</p>
+        <h2>가족이 전하는 안내</h2>
+      </div>
+      <div class="announcement-list">
+        ${announcements.map(renderAnnouncementCard).join('')}
+      </div>
+    </section>
+  `
+}
+
+function sortedAnnouncements() {
+  return [...(state.announcements ?? [])].sort((left, right) => {
+    const pinned = Number(right.pinned) - Number(left.pinned)
+    if (pinned !== 0) return pinned
+
+    return String(right.id).localeCompare(String(left.id))
+  })
+}
+
+function renderAnnouncementCard(item) {
+  return `
+    <article class="announcement-card ${item.pinned ? 'is-pinned' : ''}">
+      <div>
+        <span>${escapeHtml(announcementTypeLabel(item.announcementType))}</span>
+        ${item.pinned ? '<strong>고정</strong>' : ''}
+      </div>
+      <h3>${escapeHtml(item.title)}</h3>
+      <p>${escapeHtml(item.body)}</p>
+      <small>${escapeHtml(item.updatedAt || item.createdAt)}</small>
+    </article>
+  `
+}
+
+function announcementTypeLabel(type) {
+  const labels = {
+    notice: '공지',
+    event: '일정',
+    update: '업데이트',
+  }
+
+  return labels[type] ?? '공지'
 }
 
 function visibilityLabel(visibility) {
@@ -1348,6 +1424,8 @@ function renderEditor() {
 
       ${renderQuickRecordPanel()}
 
+      ${renderAnnouncementEditorPanel()}
+
       <div class="panel qr-panel">
         <div class="section-title">
           <p>묘비 QR</p>
@@ -1547,7 +1625,7 @@ function renderBackupImportPreview() {
     <div class="backup-import-preview">
       <strong>${escapeHtml(backup.profile.name || '이름 없음')}</strong>
       <p>
-        타임라인 ${backup.timeline.length.toLocaleString('ko-KR')}개 · 기억 카드 ${backup.moments.length.toLocaleString('ko-KR')}개 · 방명록 ${backup.guestbook.length.toLocaleString('ko-KR')}개
+        타임라인 ${backup.timeline.length.toLocaleString('ko-KR')}개 · 기억 카드 ${backup.moments.length.toLocaleString('ko-KR')}개 · 방명록 ${backup.guestbook.length.toLocaleString('ko-KR')}개 · 공지 ${backup.announcements.length.toLocaleString('ko-KR')}개
       </p>
       <p class="form-note">
         내보낸 시각: ${escapeHtml(formatDateTime(backup.exportedAt) || backup.exportedAt || '-')}
@@ -1620,6 +1698,86 @@ function renderQuickRecordPanel() {
         </button>
       </form>
     </div>
+  `
+}
+
+function renderAnnouncementEditorPanel() {
+  return `
+    <div class="panel editor-wide announcement-editor-panel">
+      <div class="section-title">
+        <p>공지사항</p>
+        <h2>방문자에게 전할 안내</h2>
+      </div>
+      <form class="announcement-form" data-announcement-form>
+        <div class="compact-grid">
+          <label>
+            제목
+            <input name="title" placeholder="예: 추모식 안내" required />
+          </label>
+          <label>
+            유형
+            <select name="announcementType">
+              ${announcementTypeOption('notice', '공지')}
+              ${announcementTypeOption('event', '일정')}
+              ${announcementTypeOption('update', '업데이트')}
+            </select>
+          </label>
+        </div>
+        <label>
+          내용
+          <textarea name="body" rows="4" placeholder="방문자에게 전하고 싶은 안내를 적어주세요." required></textarea>
+        </label>
+        <label class="checkbox-line">
+          <input type="checkbox" name="pinned" />
+          상단에 고정
+        </label>
+        <button type="submit" class="secondary-button">공지 추가</button>
+      </form>
+      <div class="announcement-edit-list">
+        ${state.announcements.length ? sortedAnnouncements().map(renderAnnouncementEditorEntry).join('') : '<p class="empty-text">아직 공지사항이 없습니다.</p>'}
+      </div>
+    </div>
+  `
+}
+
+function announcementTypeOption(value, label, selectedValue = 'notice') {
+  return `<option value="${escapeHtml(value)}" ${value === selectedValue ? 'selected' : ''}>${escapeHtml(label)}</option>`
+}
+
+function renderAnnouncementEditorEntry(item) {
+  return `
+    <form class="announcement-edit-entry" data-announcement-edit-form="${escapeHtml(item.id)}">
+      <div class="memory-edit-heading">
+        <strong>${escapeHtml(announcementTypeLabel(item.announcementType))}</strong>
+        <span>${escapeHtml(item.title)}</span>
+      </div>
+      <div class="compact-grid">
+        <label>
+          제목
+          <input name="title" value="${escapeHtml(item.title)}" required />
+        </label>
+        <label>
+          유형
+          <select name="announcementType">
+            ${announcementTypeOption('notice', '공지', item.announcementType)}
+            ${announcementTypeOption('event', '일정', item.announcementType)}
+            ${announcementTypeOption('update', '업데이트', item.announcementType)}
+          </select>
+        </label>
+      </div>
+      <label>
+        내용
+        <textarea name="body" rows="4" required>${escapeHtml(item.body)}</textarea>
+      </label>
+      <label class="checkbox-line">
+        <input type="checkbox" name="pinned" ${item.pinned ? 'checked' : ''} />
+        상단에 고정
+      </label>
+      <div class="button-row">
+        <button type="submit" class="secondary-button">수정</button>
+        <button type="button" class="danger-button" data-delete-announcement="${escapeHtml(item.id)}">삭제</button>
+      </div>
+    </form>
   `
 }
 
@@ -2028,6 +2186,9 @@ function editActionLabel(actionType) {
     guestbook_moderated: '방명록 관리',
     guestbook_author_updated: '방명록 직접 수정',
     guestbook_author_deleted: '방명록 직접 삭제',
+    announcement_created: '공지 추가',
+    announcement_updated: '공지 수정',
+    announcement_deleted: '공지 삭제',
     backup_restored: '백업 복구',
   }
 
@@ -2097,6 +2258,7 @@ function bindGlobalEvents() {
   app.querySelector('[data-profile-form]')?.addEventListener('submit', handleProfileForm)
   app.querySelector('[data-hero-image-input]')?.addEventListener('change', handleHeroImagePreview)
   app.querySelector('[data-quick-record-form]')?.addEventListener('submit', handleQuickRecordForm)
+  app.querySelector('[data-announcement-form]')?.addEventListener('submit', handleAnnouncementForm)
   app.querySelector('[data-timeline-form]')?.addEventListener('submit', handleTimelineForm)
   app.querySelector('[data-moment-form]')?.addEventListener('submit', handleMomentForm)
   app.querySelector('[data-invite-form]')?.addEventListener('submit', handleInviteForm)
@@ -2108,6 +2270,9 @@ function bindGlobalEvents() {
   })
   app.querySelectorAll('[data-moment-edit-form]').forEach((form) => {
     form.addEventListener('submit', handleMomentEditForm)
+  })
+  app.querySelectorAll('[data-announcement-edit-form]').forEach((form) => {
+    form.addEventListener('submit', handleAnnouncementEditForm)
   })
   app.querySelectorAll('[data-download-qr]').forEach((button) => {
     button.addEventListener('click', downloadQrCard)
@@ -2129,6 +2294,9 @@ function bindGlobalEvents() {
   })
   app.querySelectorAll('[data-delete-moment]').forEach((button) => {
     button.addEventListener('click', () => deleteMoment(button.dataset.deleteMoment))
+  })
+  app.querySelectorAll('[data-delete-announcement]').forEach((button) => {
+    button.addEventListener('click', () => deleteAnnouncement(button.dataset.deleteAnnouncement))
   })
   app.querySelectorAll('[data-delete-owned-guest]').forEach((button) => {
     button.addEventListener('click', () => deleteOwnedGuestEntry(button.dataset.deleteOwnedGuest))
@@ -2788,6 +2956,126 @@ async function handleQuickRecordForm(event) {
   }
 }
 
+async function handleAnnouncementForm(event) {
+  event.preventDefault()
+  const form = event.currentTarget
+  const formData = new FormData(form)
+  const payload = {
+    title: formText(formData, 'title'),
+    body: formText(formData, 'body'),
+    announcementType: formText(formData, 'announcementType') || 'notice',
+    pinned: formData.get('pinned') === 'on',
+    editorName: currentEditorName(),
+  }
+
+  if (state.isApiBacked) {
+    const ok = await runApiAction(async () => {
+      await apiRequest(`/api/memory/memorials/${currentMemorySlug()}/announcements`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+      await loadFromApi({ includeModeration: true, activeTab: 'editor' })
+    })
+    if (ok) form.reset()
+    return
+  }
+
+  const announcement = {
+    id: `a${Date.now()}`,
+    title: payload.title,
+    body: payload.body,
+    announcementType: payload.announcementType,
+    pinned: payload.pinned,
+    createdAt: new Date().toLocaleDateString('ko-KR'),
+    updatedAt: new Date().toLocaleDateString('ko-KR'),
+  }
+
+  setState((current) => ({
+    ...current,
+    announcements: [announcement, ...current.announcements],
+    editHistory: [
+      buildLocalEditEvent('announcement_created', `'${announcement.title}' 공지사항을 추가했습니다.`),
+      ...current.editHistory,
+    ],
+  }))
+  form.reset()
+}
+
+async function handleAnnouncementEditForm(event) {
+  event.preventDefault()
+  const form = event.currentTarget
+  const id = form.dataset.announcementEditForm
+  const formData = new FormData(form)
+  const payload = {
+    title: formText(formData, 'title'),
+    body: formText(formData, 'body'),
+    announcementType: formText(formData, 'announcementType') || 'notice',
+    pinned: formData.get('pinned') === 'on',
+    editorName: currentEditorName(),
+  }
+
+  if (state.isApiBacked) {
+    const ok = await runApiAction(async () => {
+      await apiRequest(`/api/memory/announcements/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      })
+      await loadFromApi({ includeModeration: true, activeTab: 'editor' })
+    })
+    if (!ok) return
+    return
+  }
+
+  setState((current) => ({
+    ...current,
+    announcements: current.announcements.map((item) =>
+      String(item.id) === String(id)
+        ? {
+            ...item,
+            title: payload.title,
+            body: payload.body,
+            announcementType: payload.announcementType,
+            pinned: payload.pinned,
+            updatedAt: new Date().toLocaleDateString('ko-KR'),
+          }
+        : item,
+    ),
+    editHistory: [
+      buildLocalEditEvent('announcement_updated', `'${payload.title}' 공지사항을 수정했습니다.`),
+      ...current.editHistory,
+    ],
+  }))
+}
+
+async function deleteAnnouncement(id) {
+  if (!id || !window.confirm('이 공지사항을 삭제할까요?')) return
+
+  if (state.isApiBacked) {
+    const ok = await runApiAction(async () => {
+      await apiRequest(`/api/memory/announcements/${id}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ editorName: currentEditorName() }),
+      })
+      await loadFromApi({ includeModeration: true, activeTab: 'editor' })
+    })
+    if (!ok) return
+    return
+  }
+
+  const currentItem = state.announcements.find((item) => String(item.id) === String(id))
+  setState((current) => ({
+    ...current,
+    announcements: current.announcements.filter((item) => String(item.id) !== String(id)),
+    editHistory: [
+      buildLocalEditEvent(
+        'announcement_deleted',
+        `'${currentItem?.title ?? '공지사항'}' 공지사항을 삭제했습니다.`,
+      ),
+      ...current.editHistory,
+    ],
+  }))
+}
+
 async function uploadMemoryImage(file) {
   const formData = new FormData()
   formData.append('file', file)
@@ -2998,6 +3286,7 @@ function collectMemoryText(profile = state.profile) {
     ...profile.tags,
     ...state.timeline.flatMap((item) => [item.year, item.title, item.body]),
     ...state.moments.flatMap((item) => [item.title, item.body, item.tag]),
+    ...state.announcements.flatMap((item) => [item.title, item.body]),
     ...visibleGuestbookEntries().flatMap((entry) => [entry.author, entry.relation, entry.message]),
   ]
     .filter(Boolean)
@@ -3849,6 +4138,7 @@ function downloadMemoryBackup() {
     timeline: state.timeline,
     moments: state.moments,
     guestbook: state.guestbook,
+    announcements: state.announcements,
     editorInvites: state.editorInvites.map((invite) => ({
       id: invite.id,
       inviteeLabel: invite.inviteeLabel,
@@ -3940,6 +4230,7 @@ function applyBackupImport() {
     timeline: backup.timeline,
     moments: backup.moments,
     guestbook: backup.guestbook,
+    announcements: backup.announcements,
     editorInvites: backup.editorInvites,
     editHistory: [
       buildLocalEditEvent('backup_restored', '백업 파일을 이 브라우저에 임시 복구했습니다.'),
@@ -3983,6 +4274,7 @@ function normalizeMemoryBackup(value) {
     timeline: normalizeBackupTimeline(value.timeline),
     moments: normalizeBackupMoments(value.moments),
     guestbook: normalizeBackupGuestbook(value.guestbook),
+    announcements: normalizeBackupAnnouncements(value.announcements),
     editorInvites: normalizeBackupInvites(value.editorInvites),
     editHistory: normalizeBackupEditHistory(value.editHistory),
   }
@@ -4027,6 +4319,22 @@ function normalizeBackupGuestbook(value) {
       status: allowedValue(entry.status, ['pending', 'approved', 'hidden'], 'pending'),
       pinned: Boolean(entry.pinned),
       createdAt: stringOr(entry.createdAt, ''),
+    }
+  })
+}
+
+function normalizeBackupAnnouncements(value) {
+  return arrayOrEmpty(value).map((rawItem, index) => {
+    const item = objectOrEmpty(rawItem)
+
+    return {
+      id: stringOr(item.id, `restore-a${index + 1}`),
+      title: stringOr(item.title, '공지사항'),
+      body: stringOr(item.body, ''),
+      announcementType: allowedValue(item.announcementType, ['notice', 'event', 'update'], 'notice'),
+      pinned: Boolean(item.pinned),
+      createdAt: stringOr(item.createdAt, ''),
+      updatedAt: stringOr(item.updatedAt, ''),
     }
   })
 }
