@@ -770,6 +770,195 @@ main {
   line-height: 1.45;
 }
 
+.partner-create-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1.1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.partner-create-copy,
+.partner-handoff-hero {
+  display: grid;
+  gap: 18px;
+  border-radius: 8px;
+  background: var(--hero-bg);
+  color: var(--hero-ink);
+  padding: 34px;
+  box-shadow: var(--shadow);
+}
+
+.partner-create-copy {
+  min-height: 560px;
+  align-content: center;
+}
+
+.partner-create-copy h1,
+.partner-handoff-hero h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.7rem, 5vw, 4.7rem);
+  line-height: 1.08;
+}
+
+.partner-create-copy p,
+.partner-handoff-hero p {
+  margin: 0;
+  color: var(--hero-muted);
+  font-size: 1.08rem;
+  font-weight: 850;
+  line-height: 1.6;
+}
+
+.partner-create-steps {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.partner-create-steps .business-step {
+  border-color: color-mix(in srgb, var(--hero-ink) 25%, transparent);
+}
+
+.partner-create-form {
+  display: grid;
+  gap: 14px;
+}
+
+.partner-consent-box {
+  display: grid;
+  gap: 10px;
+  border: 2px solid var(--highlight);
+  border-radius: 8px;
+  background: var(--highlight-soft);
+  padding: 14px;
+}
+
+.partner-consent-box .checkbox-line span {
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.partner-handoff-shell {
+  display: grid;
+  gap: 22px;
+}
+
+.partner-handoff-hero {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.34fr);
+  align-items: end;
+}
+
+.partner-handoff-meta {
+  display: grid;
+  gap: 8px;
+}
+
+.partner-handoff-meta span {
+  border: 1px solid color-mix(in srgb, var(--hero-ink) 25%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--hero-ink) 10%, transparent);
+  color: var(--hero-ink);
+  padding: 10px 12px;
+  font-weight: 900;
+}
+
+.partner-handoff-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.78fr) minmax(0, 1.22fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.partner-handoff-card,
+.partner-handoff-panel,
+.partner-checklist,
+.partner-empty {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.partner-handoff-card {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.partner-card-brand {
+  border-radius: 999px;
+  background: var(--highlight-soft);
+  color: var(--ink);
+  padding: 7px 12px;
+  font-weight: 1000;
+}
+
+.partner-handoff-card h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+}
+
+.partner-handoff-card p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.partner-card-qr {
+  display: grid;
+  width: min(100%, 310px);
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 20px;
+}
+
+.partner-card-qr .qr-code {
+  width: 100%;
+}
+
+.partner-handoff-card strong {
+  color: var(--accent-strong);
+  line-height: 1.4;
+}
+
+.partner-handoff-panel,
+.partner-empty {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+}
+
+.partner-copy-block {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 14px;
+}
+
+.partner-copy-block > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.partner-copy-block p {
+  margin: 0;
+  white-space: pre-line;
+  color: var(--ink);
+  font-weight: 850;
+  line-height: 1.55;
+}
+
 .hero-photo,
 .hero-card,
 .panel,
@@ -2326,6 +2515,9 @@ textarea {
   .hero-section,
   .business-hero,
   .create-shell,
+  .partner-create-shell,
+  .partner-handoff-hero,
+  .partner-handoff-layout,
   .content-grid,
   .guestbook-layout,
   .editor-layout,
@@ -2371,6 +2563,10 @@ textarea {
   .create-copy {
     min-height: auto;
   }
+
+  .partner-create-copy {
+    min-height: auto;
+  }
 }
 
 @media (max-width: 560px) {
@@ -2393,7 +2589,9 @@ textarea {
   }
 
   .business-hero,
-  .business-section {
+  .business-section,
+  .partner-create-copy,
+  .partner-handoff-hero {
     padding: 20px;
   }
 
@@ -2416,7 +2614,10 @@ textarea {
   .business-hero .primary-link-button,
   .business-hero .secondary-link-button,
   .business-contact-actions .primary-link-button,
-  .business-contact-actions .secondary-link-button {
+  .business-contact-actions .secondary-link-button,
+  .partner-handoff-panel .primary-button,
+  .partner-handoff-panel .secondary-button,
+  .partner-handoff-panel .secondary-link-button {
     width: 100%;
     justify-content: center;
   }
@@ -2479,5 +2680,36 @@ textarea {
 
   .copy-field-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .app-header,
+  .partner-handoff-hero,
+  .partner-handoff-panel,
+  .partner-checklist,
+  .status-note {
+    display: none;
+  }
+
+  .business-main {
+    width: 100%;
+    padding: 0;
+  }
+
+  .partner-handoff-layout {
+    display: block;
+  }
+
+  .partner-handoff-card {
+    width: 100%;
+    min-height: 90vh;
+    border: 4px solid #111827;
+    box-shadow: none;
+    break-inside: avoid;
   }
 }

@@ -255,6 +255,7 @@ const initialState = {
   selectedTributeTierId: '',
   tributeOrders: [],
   tributeOrderMessage: '',
+  partnerHandoff: null,
   inviteLink: '',
   editorInvites: [],
   familyMembers: [],
@@ -792,6 +793,14 @@ function memoryCreateUrl() {
   return `${memoryBaseUrl()}#/new`
 }
 
+function memoryPartnerCreateUrl() {
+  return `${memoryBaseUrl()}#/partner/new`
+}
+
+function memoryPartnerHandoffUrl(slug = state.profile.slug || currentMemorySlug()) {
+  return `${memoryBaseUrl()}#/partner/handoff/${encodeURIComponent(slug)}`
+}
+
 function memoryBusinessUrl() {
   return `${memoryBaseUrl()}#/business`
 }
@@ -849,14 +858,29 @@ function isBusinessRoute() {
   return window.location.hash.startsWith('#/business')
 }
 
+function isPartnerCreateRoute() {
+  return window.location.hash.startsWith('#/partner/new')
+}
+
+function isPartnerHandoffRoute() {
+  return window.location.hash.startsWith('#/partner/handoff')
+}
+
 function isCreateRoute() {
   const hasQuerySlug = Boolean(new URLSearchParams(window.location.search).get('slug'))
 
-  return !isBusinessRoute() && (window.location.hash.startsWith('#/new') || (!window.location.hash && !hasQuerySlug))
+  return (
+    !isBusinessRoute() &&
+    !isPartnerCreateRoute() &&
+    !isPartnerHandoffRoute() &&
+    (window.location.hash.startsWith('#/new') || (!window.location.hash && !hasQuerySlug))
+  )
 }
 
 function currentMemorySlug() {
-  const hashMatch = window.location.hash.match(/^#\/m\/([^/?#]+)/)
+  const hashMatch =
+    window.location.hash.match(/^#\/m\/([^/?#]+)/) ??
+    window.location.hash.match(/^#\/partner\/handoff\/([^/?#]+)/)
   const querySlug = new URLSearchParams(window.location.search).get('slug')
   const rawSlug = hashMatch?.[1] ?? querySlug ?? DEFAULT_MEMORY_SLUG
 
@@ -1025,6 +1049,7 @@ function render() {
         </a>
         <nav class="top-nav" aria-label="주요 메뉴">
           ${navLink(memoryBusinessUrl(), '사업자 제휴', true)}
+          ${navLink(memoryPartnerCreateUrl(), '5분 생성', false)}
           ${navLink(memoryPageUrlForSlug(DEFAULT_MEMORY_SLUG), '샘플 추모관', false)}
           ${navLink(memoryCreateUrl(), '새 추모관', false)}
         </nav>
@@ -1033,6 +1058,29 @@ function render() {
 
       <main class="business-main">
         ${renderBusinessLanding()}
+      </main>
+    `
+    bindGlobalEvents()
+    return
+  }
+
+  if (isPartnerCreateRoute() || isPartnerHandoffRoute()) {
+    app.innerHTML = `
+      <header class="app-header">
+        <a class="brand" href="${escapeHtml(memoryBusinessUrl())}" aria-label="Silver Memory 파트너 홈">
+          <span>Silver Memory</span>
+        </a>
+        <nav class="top-nav" aria-label="주요 메뉴">
+          ${navLink(memoryPartnerCreateUrl(), '5분 생성', isPartnerCreateRoute())}
+          ${navLink(memoryBusinessUrl(), '사업자 제휴', false)}
+          ${navLink(memoryPageUrlForSlug(DEFAULT_MEMORY_SLUG), '샘플 추모관', false)}
+        </nav>
+        <div class="storage-status is-live">현장 모드</div>
+      </header>
+
+      <main class="business-main">
+        ${state.apiError ? `<p class="status-note">${escapeHtml(state.apiError)}</p>` : ''}
+        ${isPartnerHandoffRoute() ? renderPartnerHandoff() : renderPartnerQuickCreate()}
       </main>
     `
     bindGlobalEvents()
@@ -1114,8 +1162,8 @@ function renderBusinessLanding() {
           ${renderBusinessProof('유족', '편집 코드 제공')}
         </div>
         <div class="button-row">
-          <a class="primary-link-button" href="${escapeHtml(businessInquiryUrl())}">
-            제휴 문의하기
+          <a class="primary-link-button" href="${escapeHtml(memoryPartnerCreateUrl())}">
+            5분 생성 열기
           </a>
           <a class="secondary-link-button" href="${escapeHtml(memoryPageUrlForSlug(DEFAULT_MEMORY_SLUG))}">
             샘플 추모관 보기
@@ -1233,7 +1281,10 @@ function renderBusinessLanding() {
           제휴 문의 메일 보내기
         </a>
         <a class="secondary-link-button" href="${escapeHtml(memoryCreateUrl())}">
-          파일럿 추모관 만들기
+          유족용 생성 열기
+        </a>
+        <a class="secondary-link-button" href="${escapeHtml(memoryPartnerCreateUrl())}">
+          현장 5분 생성
         </a>
       </div>
       <p class="business-contact-note">
@@ -1361,6 +1412,247 @@ function renderBusinessInquiryForm() {
       }
     </form>
   `
+}
+
+function renderPartnerQuickCreate() {
+  return `
+    <section class="partner-create-shell">
+      <div class="partner-create-copy">
+        <p class="eyebrow">현장 5분 생성</p>
+        <h1>직원이 먼저 만들고, 유족이 나중에 완성합니다</h1>
+        <p>
+          장례 현장에서는 모든 기록을 다 받으려 하지 말고, 이름과 공개 범위만 확인해 QR 추모관을 먼저 열어주세요.
+          사진과 자세한 이야기는 유족 편집 코드로 이후에 채울 수 있습니다.
+        </p>
+        <div class="partner-create-steps">
+          ${renderBusinessStep('1', '유족 동의 확인')}
+          ${renderBusinessStep('2', '기본 정보 입력')}
+          ${renderBusinessStep('3', 'QR과 유족 코드 전달')}
+        </div>
+      </div>
+
+      <form class="panel partner-create-form" data-create-memorial-form data-partner-create-form="true">
+        <div class="section-title">
+          <p>빠른 생성 정보</p>
+          <h2>현장에서 꼭 필요한 내용만 받습니다</h2>
+        </div>
+        <div class="compact-grid">
+          <label>
+            고인 또는 추모 대상 이름
+            <input name="displayName" placeholder="예: 김영수" required />
+          </label>
+          <label>
+            생애 기간
+            <input name="years" placeholder="예: 1942 - 2026" />
+          </label>
+        </div>
+        <label>
+          한 줄 소개
+          <input name="subtitle" placeholder="예: 가족과 바다를 사랑한 사람" />
+        </label>
+        <label>
+          장례식장/안치 위치
+          <input name="location" placeholder="예: OO 장례식장 3호실" />
+        </label>
+        <div class="compact-grid">
+          <label>
+            공개 범위
+            <select name="visibility">
+              <option value="link">QR/링크 공개</option>
+              <option value="private">가족만 공개</option>
+              <option value="public">전체 공개</option>
+            </select>
+          </label>
+          <label>
+            연락 받을 유족
+            <input name="familyContact" placeholder="예: 장남 김민수 / 010-0000-0000" />
+          </label>
+        </div>
+        <div class="compact-grid">
+          <label>
+            페이지 구성
+            <select name="pageTemplate">
+              <option value="classic">기록관형</option>
+              <option value="letter">편지형</option>
+              <option value="gallery">사진첩형</option>
+              <option value="album">앨범형</option>
+            </select>
+          </label>
+          <label>
+            분위기
+            <select name="designTheme">
+              <option value="paper">한지 편지</option>
+              <option value="warm">따뜻한 기록</option>
+              <option value="garden">조용한 정원</option>
+              <option value="graphite">담백한 기록관</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          현장 직원 이름
+          <input name="staffName" placeholder="예: 담당자 박지훈" />
+        </label>
+        <input type="hidden" name="memorialKind" value="person" />
+        <input type="hidden" name="tags" value="가족, 추모관, QR 추모" />
+        <div class="partner-consent-box">
+          <label class="checkbox-line">
+            <input type="checkbox" name="consentPublicPage" required />
+            <span>유족에게 QR 추모관 생성 목적과 공개 범위를 설명했습니다.</span>
+          </label>
+          <label class="checkbox-line">
+            <input type="checkbox" name="consentEditorCode" required />
+            <span>유족 코드가 편집 권한이며 안전하게 전달해야 함을 확인했습니다.</span>
+          </label>
+        </div>
+        <button type="submit" class="primary-button" data-create-submit>
+          QR 추모관 만들기
+        </button>
+      </form>
+    </section>
+  `
+}
+
+function renderPartnerHandoff() {
+  const slug = state.profile.slug || currentMemorySlug()
+  const pageUrl = memoryPageUrlForSlug(slug)
+  const editorToken = state.editorToken || state.lastIssuedEditorToken || ''
+  const familyContact = state.partnerHandoff?.familyContact || ''
+  const staffName = state.partnerHandoff?.staffName || '현장 담당자'
+  const familyGuide = buildFamilyGuideMessage(pageUrl, editorToken)
+
+  if (!editorToken || !state.profile.name) {
+    return `
+      <section class="partner-empty panel">
+        <div class="section-title">
+          <p>인계 화면</p>
+          <h1>아직 생성된 추모관이 없습니다</h1>
+        </div>
+        <p>현장 5분 생성에서 QR 추모관을 먼저 만든 뒤 이 화면에서 유족에게 전달할 정보를 확인할 수 있습니다.</p>
+        <a class="primary-link-button" href="${escapeHtml(memoryPartnerCreateUrl())}">
+          5분 생성으로 이동
+        </a>
+      </section>
+    `
+  }
+
+  return `
+    <section class="partner-handoff-shell">
+      <div class="partner-handoff-hero">
+        <div>
+          <p class="eyebrow">현장 인계 완료</p>
+          <h1>${escapeHtml(state.profile.name)} 추모관이 준비되었습니다</h1>
+          <p>
+            QR 카드, 방문자 링크, 유족 편집 코드를 유족에게 전달해 주세요.
+            세부 생애 기록과 사진은 유족이 이후 편집기에서 이어서 채울 수 있습니다.
+          </p>
+        </div>
+        <div class="partner-handoff-meta">
+          <span>담당자 ${escapeHtml(staffName)}</span>
+          ${familyContact ? `<span>유족 연락 ${escapeHtml(familyContact)}</span>` : ''}
+          <span>${escapeHtml(state.partnerHandoff?.createdAt || new Date().toLocaleString('ko-KR'))}</span>
+        </div>
+      </div>
+
+      <div class="partner-handoff-layout">
+        <section class="partner-handoff-card" aria-label="QR 카드 미리보기">
+          <div class="partner-card-brand">Silver Memory QR</div>
+          <h2>${escapeHtml(state.profile.name)}</h2>
+          <p>${escapeHtml(state.profile.years || state.profile.subtitle || '가족의 기억 보관소')}</p>
+          <div class="partner-card-qr">
+            ${createQrSvg(pageUrl, {
+              moduleSize: 6,
+              quiet: 3,
+              dark: currentDesignTheme().qrDark,
+            })}
+          </div>
+          <strong>휴대폰 카메라로 QR을 비추면 추모관이 열립니다.</strong>
+        </section>
+
+        <section class="partner-handoff-panel">
+          <div class="section-title">
+            <p>유족 전달 정보</p>
+            <h2>링크와 편집 코드를 안전하게 전달하세요</h2>
+          </div>
+          ${renderCopyField({
+            label: '방문자 링크',
+            value: pageUrl,
+            description: 'QR이 인쇄물에서 잘 안 읽힐 때 문자로 함께 전달할 수 있습니다.',
+            buttonLabel: '링크 복사',
+          })}
+          ${renderCopyField({
+            label: '유족 편집 코드',
+            value: editorToken,
+            description: '이 코드를 가진 사람은 추모관 내용을 수정할 수 있습니다. 유족에게만 전달해 주세요.',
+            buttonLabel: '코드 복사',
+          })}
+          ${renderPartnerCopyBlock({
+            title: '유족 안내 문자',
+            body: familyGuide,
+            buttonLabel: '안내문 복사',
+          })}
+          <div class="button-row">
+            <button type="button" class="primary-button" data-download-qr>
+              QR 카드 다운로드
+            </button>
+            <button type="button" class="secondary-button" data-print-partner-handoff>
+              인계 화면 인쇄
+            </button>
+            <a class="secondary-link-button" href="${escapeHtml(pageUrl)}">
+              추모관 열기
+            </a>
+          </div>
+        </section>
+      </div>
+
+      <section class="partner-checklist panel">
+        <div class="section-title">
+          <p>직원 체크리스트</p>
+          <h2>전달 전 세 가지만 확인합니다</h2>
+        </div>
+        <div class="setup-step-list">
+          ${renderPartnerChecklistItem('QR 카드가 실제 휴대폰 카메라에서 열리는지 확인')}
+          ${renderPartnerChecklistItem('유족 코드가 문자 또는 종이 안내문으로 안전하게 전달됐는지 확인')}
+          ${renderPartnerChecklistItem('공개 범위가 유족 의사와 일치하는지 확인')}
+        </div>
+      </section>
+    </section>
+  `
+}
+
+function renderPartnerCopyBlock({ title, body, buttonLabel }) {
+  return `
+    <div class="partner-copy-block">
+      <div>
+        <span class="field-label">${escapeHtml(title)}</span>
+        <button type="button" class="secondary-button" data-copy-text="${escapeHtml(body)}">
+          ${escapeHtml(buttonLabel)}
+        </button>
+      </div>
+      <p>${escapeHtml(body)}</p>
+    </div>
+  `
+}
+
+function renderPartnerChecklistItem(body) {
+  return `
+    <article class="setup-step is-done">
+      <strong>확인</strong>
+      <div>
+        <h3>${escapeHtml(body)}</h3>
+        <p>현장 인계 전에 담당자가 직접 확인합니다.</p>
+      </div>
+    </article>
+  `
+}
+
+function buildFamilyGuideMessage(pageUrl, editorToken) {
+  return [
+    '[Silver Memory QR 추모관 안내]',
+    `방문자 링크: ${pageUrl}`,
+    `유족 편집 코드: ${editorToken}`,
+    '위 코드는 추모관 내용을 수정할 수 있는 권한입니다. 가족에게만 공유해 주세요.',
+    '사진, 생애 이야기, 방명록 승인, QR 카드 다운로드는 유족 편집기에서 할 수 있습니다.',
+  ].join('\n')
 }
 
 function renderPrivateMemorialNotice() {
@@ -3482,6 +3774,9 @@ function bindGlobalEvents() {
   app.querySelectorAll('[data-download-qr]').forEach((button) => {
     button.addEventListener('click', downloadQrCard)
   })
+  app.querySelector('[data-print-partner-handoff]')?.addEventListener('click', () => {
+    window.print()
+  })
   app.querySelectorAll('[data-download-backup]').forEach((button) => {
     button.addEventListener('click', downloadMemoryBackup)
   })
@@ -3910,11 +4205,22 @@ async function handleCreateMemorialForm(event) {
   const form = event.currentTarget
   const formData = new FormData(form)
   const submitButton = form.querySelector('[data-create-submit]')
-  const editorName = '유족'
+  const isPartnerCreate = form.dataset.partnerCreateForm === 'true'
+  const editorName = isPartnerCreate
+    ? formText(formData, 'staffName') || '현장 담당자'
+    : '유족'
+
+  if (isPartnerCreate && (formData.get('consentPublicPage') !== 'on' || formData.get('consentEditorCode') !== 'on')) {
+    setState((current) => ({
+      ...current,
+      apiError: '유족 동의와 편집 코드 안내 확인이 필요합니다.',
+    }))
+    return
+  }
 
   if (submitButton) {
     submitButton.disabled = true
-    submitButton.textContent = '만드는 중'
+    submitButton.textContent = isPartnerCreate ? 'QR 준비 중' : '만드는 중'
   }
 
   try {
@@ -3925,7 +4231,7 @@ async function handleCreateMemorialForm(event) {
         years: formText(formData, 'years') || null,
         subtitle: formText(formData, 'subtitle') || null,
         location: formText(formData, 'location') || null,
-        visibility: 'link',
+        visibility: formText(formData, 'visibility') || 'link',
         tags: parseTags(String(formData.get('tags') ?? '')),
         memorialKind: String(formData.get('memorialKind') ?? DEFAULT_MEMORIAL_KIND),
         pageTemplate: String(formData.get('pageTemplate') ?? DEFAULT_PAGE_TEMPLATE),
@@ -3940,12 +4246,29 @@ async function handleCreateMemorialForm(event) {
       editorName,
       editorToken: result.editorToken,
       lastIssuedEditorToken: result.editorToken,
+      partnerHandoff: isPartnerCreate
+        ? {
+            staffName: editorName,
+            familyContact: formText(formData, 'familyContact'),
+            createdAt: new Date().toLocaleString('ko-KR', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+          }
+        : null,
       isApiBacked: true,
       isLoading: false,
       apiError: '',
     }
 
-    window.history.pushState(null, '', memoryPageUrlForSlug(nextState.profile.slug))
+    window.history.pushState(
+      null,
+      '',
+      isPartnerCreate ? memoryPartnerHandoffUrl(nextState.profile.slug) : memoryPageUrlForSlug(nextState.profile.slug),
+    )
     state = nextState
     saveState()
     render()
@@ -3957,12 +4280,14 @@ async function handleCreateMemorialForm(event) {
           ? '이미 사용 중인 주소입니다. 다시 시도해주세요.'
           : error.status === 429
             ? '짧은 시간에 새 추모관을 너무 많이 만들었습니다. 잠시 후 다시 시도해주세요.'
-            : '새 추모관을 만들려면 백엔드 연결이 필요합니다.',
+            : isPartnerCreate
+              ? '현장 QR 추모관을 만들려면 백엔드 연결이 필요합니다.'
+              : '새 추모관을 만들려면 백엔드 연결이 필요합니다.',
     }))
   } finally {
     if (submitButton && document.body.contains(submitButton)) {
       submitButton.disabled = false
-      submitButton.textContent = '추모관 만들기'
+      submitButton.textContent = isPartnerCreate ? 'QR 추모관 만들기' : '추모관 만들기'
     }
   }
 }
@@ -6067,7 +6392,7 @@ function safeFilenamePart(value) {
 }
 
 function downloadQrCard() {
-  const pageUrl = memoryPageUrl()
+  const pageUrl = memoryPageUrlForSlug(state.profile.slug || currentMemorySlug())
   const theme = currentDesignTheme()
   const qrMatrix = createQrMatrix(pageUrl)
   const qrModuleSize = 5
