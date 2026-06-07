@@ -147,16 +147,34 @@ const TRIBUTE_TIERS = [
   {
     id: 'small-flower',
     label: '작은 꽃',
-    amountLabel: '4,000원',
     displayLabel: '꽃 한 송이',
+    amounts: {
+      KRW: 4000,
+      USD: 400,
+    },
     description: '방명록보다 더 짧게, 조용한 마음을 남깁니다.',
   },
   {
     id: 'memorial-bouquet',
     label: '추모 꽃다발',
-    amountLabel: '20,000원',
     displayLabel: '추모 꽃다발',
+    amounts: {
+      KRW: 20000,
+      USD: 2000,
+    },
     description: '가족에게 오래 보이는 추모의 표시를 남깁니다.',
+  },
+]
+const TRIBUTE_CURRENCIES = [
+  {
+    code: 'KRW',
+    label: '한국 원화',
+    helper: '국내 카드/간편결제 우선',
+  },
+  {
+    code: 'USD',
+    label: '미국 달러',
+    helper: '해외 카드 결제 대비',
   },
 ]
 const EDIT_ACTION_LABELS = {
@@ -231,6 +249,7 @@ const initialState = {
   pendingBackupImport: null,
   backupImportMessage: '',
   tributeMessage: '',
+  tributeCurrency: 'KRW',
   inviteLink: '',
   editorInvites: [],
   familyMembers: [],
@@ -1622,25 +1641,30 @@ function renderGuestPreview() {
 
 function renderTributePanel() {
   const tributes = state.tributes ?? []
+  const currency = currentTributeCurrency()
 
   return `
     <section class="guest-preview tribute-section">
       <div class="section-title">
-        <p>남겨진 꽃</p>
+        <p>전세계 디지털 헌화</p>
         <h2>방문자가 조용히 남긴 마음</h2>
       </div>
       <div class="tribute-layout">
         <div class="tribute-copy">
           <p>
-            실제 결제 연동 전 시범 기능입니다. 지금은 과금 없이 꽃이 남는 흐름만 확인합니다.
+            해외에 있는 가족과 지인도 카드 결제로 꽃과 마음을 남길 수 있도록 준비 중입니다.
+            지금은 과금 없이 결제 준비 흐름만 확인합니다.
           </p>
           <p class="tribute-refund-note">
             운영 결제에서는 결제 버튼 전에 환불 가능 조건과 처리 예상 시간을 먼저 안내합니다.
           </p>
           ${state.tributeMessage ? `<p class="status-note">${escapeHtml(state.tributeMessage)}</p>` : ''}
+          <div class="tribute-currency-switch" aria-label="헌화 결제 통화 선택">
+            ${TRIBUTE_CURRENCIES.map(renderTributeCurrencyChoice).join('')}
+          </div>
         </div>
         <div class="tribute-tier-list" aria-label="추모 꽃 선택">
-          ${TRIBUTE_TIERS.map(renderTributeTier).join('')}
+          ${TRIBUTE_TIERS.map((tier) => renderTributeTier(tier, currency)).join('')}
         </div>
       </div>
       <div class="tribute-list">
@@ -1654,16 +1678,34 @@ function renderTributePanel() {
   `
 }
 
-function renderTributeTier(tier) {
+function renderTributeCurrencyChoice(currency) {
+  const selected = currentTributeCurrency() === currency.code
+
+  return `
+    <button
+      type="button"
+      class="tribute-currency-choice ${selected ? 'is-selected' : ''}"
+      data-tribute-currency="${escapeHtml(currency.code)}"
+      aria-pressed="${selected ? 'true' : 'false'}"
+    >
+      <strong>${escapeHtml(currency.code)}</strong>
+      <span>${escapeHtml(currency.label)}</span>
+      <small>${escapeHtml(currency.helper)}</small>
+    </button>
+  `
+}
+
+function renderTributeTier(tier, currency = currentTributeCurrency()) {
   return `
     <article class="tribute-tier-card">
       <div>
         <strong>${escapeHtml(tier.label)}</strong>
-        <span>${escapeHtml(tier.amountLabel)}</span>
+        <span>${escapeHtml(formatTributeAmount(tier.amounts[currency], currency))}</span>
       </div>
       <p>${escapeHtml(tier.description)}</p>
+      <small>${escapeHtml(tributeFeeSummary(tier, currency))}</small>
       <button type="button" class="secondary-button" data-tribute-tier="${escapeHtml(tier.id)}">
-        시범으로 남기기
+        결제 준비 시범
       </button>
     </article>
   `
@@ -1675,9 +1717,42 @@ function renderTributeEntry(tribute) {
       <strong>${escapeHtml(tribute.tierLabel || '꽃')}</strong>
       <p>${escapeHtml(tribute.message || '따뜻한 마음을 남겼습니다.')}</p>
       <span>${escapeHtml(tribute.giverName || '익명 방문자')} · ${escapeHtml(tribute.createdAt || '')}</span>
+      ${tribute.amountLabel ? `<span>${escapeHtml(tribute.amountLabel)}</span>` : ''}
       ${tribute.paymentStatus === 'demo' || !tribute.paymentStatus ? '<small>시범 기록 · 실제 결제 없음</small>' : ''}
+      ${tribute.paymentStatus === 'draft' ? '<small>결제 준비 주문 · 승인 전</small>' : ''}
     </article>
   `
+}
+
+function currentTributeCurrency() {
+  return TRIBUTE_CURRENCIES.some((currency) => currency.code === state.tributeCurrency)
+    ? state.tributeCurrency
+    : 'KRW'
+}
+
+function formatTributeAmount(amount, currency) {
+  if (currency === 'USD') {
+    return `$${(amount / 100).toFixed(2)}`
+  }
+
+  return `${amount.toLocaleString('ko-KR')}원`
+}
+
+function estimateTributeProviderFee(amount, currency) {
+  if (currency === 'USD') {
+    return Math.round(amount * 0.039) + 30
+  }
+
+  return Math.round(amount * 0.035)
+}
+
+function tributeFeeSummary(tier, currency) {
+  const amount = tier.amounts[currency]
+  const providerFee = estimateTributeProviderFee(amount, currency)
+  const platformFee = Math.round(amount * 0.1)
+  const familyAmount = Math.max(0, amount - providerFee - platformFee)
+
+  return `예상 전달액 ${formatTributeAmount(familyAmount, currency)} · 수수료/운영비 결제 전 고지`
 }
 
 function heroEyebrow() {
@@ -2996,6 +3071,14 @@ function bindGlobalEvents() {
   app.querySelectorAll('[data-tribute-tier]').forEach((button) => {
     button.addEventListener('click', () => addTributeDraft(button.dataset.tributeTier))
   })
+  app.querySelectorAll('[data-tribute-currency]').forEach((button) => {
+    button.addEventListener('click', () => {
+      setState((current) => ({
+        ...current,
+        tributeCurrency: button.dataset.tributeCurrency ?? 'KRW',
+      }))
+    })
+  })
   app
     .querySelector('[data-backup-import-input]')
     ?.addEventListener('change', handleBackupImportFile)
@@ -3183,7 +3266,7 @@ async function handleBusinessInquiryForm(event) {
   }
 }
 
-function addTributeDraft(tierId) {
+async function addTributeDraft(tierId) {
   const tier = TRIBUTE_TIERS.find((item) => item.id === tierId)
   if (!tier) return
 
@@ -3193,6 +3276,48 @@ function addTributeDraft(tierId) {
     month: '2-digit',
     day: '2-digit',
   })
+
+  const currency = currentTributeCurrency()
+
+  if (state.isApiBacked) {
+    try {
+      const order = await apiRequest(`/api/memory/memorials/${currentMemorySlug()}/tribute-orders`, {
+        method: 'POST',
+        body: JSON.stringify({
+          tierId: tier.id,
+          giverName: '익명 방문자',
+          message: '따뜻한 마음을 남겼습니다.',
+          visibility: 'anonymous',
+          currency,
+        }),
+      })
+
+      setState((current) => ({
+        ...current,
+        tributeMessage:
+          '결제 준비 주문을 만들었습니다. 아직 실제 결제와 정산은 발생하지 않았습니다.',
+        tributes: [
+          {
+            id: `tr${order.id}`,
+            tierId: order.tierId,
+            tierLabel: order.tierLabel,
+            giverName: order.giverName || '익명 방문자',
+            message: order.message || '따뜻한 마음을 남겼습니다.',
+            visibility: order.visibility,
+            currency: order.currency,
+            amountLabel: formatTributeAmount(order.amount, order.currency),
+            paymentStatus: order.paymentStatus,
+            refundStatus: order.refundStatus,
+            createdAt,
+          },
+          ...(current.tributes ?? []),
+        ],
+      }))
+      return
+    } catch {
+      // Fall back to a local non-payment draft below.
+    }
+  }
 
   setState((current) => ({
     ...current,
@@ -3206,6 +3331,8 @@ function addTributeDraft(tierId) {
         giverName: '익명 방문자',
         message: '따뜻한 마음을 남겼습니다.',
         visibility: 'anonymous',
+        currency,
+        amountLabel: formatTributeAmount(tier.amounts[currency], currency),
         paymentStatus: 'demo',
         refundStatus: 'none',
         createdAt,
@@ -5250,6 +5377,10 @@ function normalizeBackupTributes(value) {
       giverName: stringOr(entry.giverName, '익명 방문자'),
       message: stringOr(entry.message, '따뜻한 마음을 남겼습니다.'),
       visibility: allowedValue(entry.visibility, ['public', 'anonymous', 'private'], 'anonymous'),
+      currency: allowedValue(entry.currency, ['KRW', 'USD'], 'KRW'),
+      amountLabel: stringOr(entry.amountLabel, ''),
+      paymentStatus: allowedValue(entry.paymentStatus, ['demo', 'draft', 'pending', 'paid', 'failed', 'canceled', 'refund_requested', 'partially_refunded', 'refunded', 'refund_rejected'], 'demo'),
+      refundStatus: allowedValue(entry.refundStatus, ['none', 'requested', 'approved', 'partial', 'refunded', 'rejected'], 'none'),
       createdAt: stringOr(entry.createdAt, ''),
     }
   })
