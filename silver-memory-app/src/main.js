@@ -1108,6 +1108,11 @@ function renderBusinessLanding() {
           유족에게는 고인의 생애 페이지와 방명록을, 사업자에게는 차별화된 디지털 추모 서비스를 제공합니다.
           인쇄 QR 카드부터 묘비 스티커, 유족 편집기까지 한 흐름으로 준비합니다.
         </p>
+        <div class="business-proof-row" aria-label="도입 핵심 지표">
+          ${renderBusinessProof('5분', '현장 생성 목표')}
+          ${renderBusinessProof('즉시', 'QR 카드 다운로드')}
+          ${renderBusinessProof('유족', '편집 코드 제공')}
+        </div>
         <div class="button-row">
           <a class="primary-link-button" href="${escapeHtml(businessInquiryUrl())}">
             제휴 문의하기
@@ -1140,9 +1145,29 @@ function renderBusinessLanding() {
       </div>
     </section>
 
+    <section class="business-section business-launch-kit">
+      <div class="section-title">
+        <p>현장 도입 키트</p>
+        <h2>직원이 설명하고, 유족이 바로 받을 수 있는 구성</h2>
+      </div>
+      <div class="business-launch-grid">
+        ${renderBusinessLaunchItem('유족 동의 문구', '개인정보와 공개 범위를 설명하고 링크 공개 또는 가족 공개를 선택합니다.')}
+        ${renderBusinessLaunchItem('5분 생성 화면', '이름, 기간, 소개, 템플릿만 입력해 QR 추모관을 먼저 만들고 세부 기록은 유족이 이어서 편집합니다.')}
+        ${renderBusinessLaunchItem('QR 카드/스티커', '장례식장 안내지, 봉안당, 묘비 주변에 붙일 수 있는 QR 이미지를 내려받습니다.')}
+        ${renderBusinessLaunchItem('사후 관리', '유족 코드, 방명록 승인, 백업, 디지털 헌화 주문 관리까지 한 화면에서 안내합니다.')}
+      </div>
+      <aside class="business-script-panel">
+        <strong>직원 설명 예시</strong>
+        <p>
+          "종이 방명록은 장례 이후 보기 어렵기 때문에, 가족과 지인이 오래 남길 수 있는 QR 추모관을 함께 만들어드립니다.
+          유족분은 나중에 사진과 이야기를 직접 추가하실 수 있습니다."
+        </p>
+      </aside>
+    </section>
+
     <section class="business-section">
       <div class="section-title">
-        <p>사업자에게 필요한 이유</p>
+        <p>사업자 가치</p>
         <h2>장례식장의 경험을 디지털 추모까지 확장합니다</h2>
       </div>
       <div class="business-value-grid">
@@ -1156,12 +1181,28 @@ function renderBusinessLanding() {
     <section class="business-section">
       <div class="section-title">
         <p>제휴 상품안</p>
-        <h2>작게 시작하고, 반응이 좋으면 패키지화합니다</h2>
+        <h2>초기에는 작은 파일럿으로 시작합니다</h2>
       </div>
       <div class="business-package-grid">
-        ${renderBusinessPackage('파일럿', '상담 후 결정', ['샘플 추모관 생성', 'QR 카드 SVG 제공', '직원 안내 스크립트'])}
-        ${renderBusinessPackage('스탠다드', '월 파트너 요금', ['추모관 생성 건수 관리', '브랜드 안내 문구', '유족 편집 지원'])}
-        ${renderBusinessPackage('프리미엄', '맞춤 견적', ['봉안당/추모공원 QR 스티커', '관리자 대시보드', '데이터 백업/이관 지원'])}
+        ${renderBusinessPackage('파일럿', '도입비 30만원부터', ['샘플 추모관 1개', 'QR 카드 이미지 제공', '직원 안내 스크립트', '첫 10건 운영 피드백'])}
+        ${renderBusinessPackage('스탠다드', '1건 9,900원부터', ['추모관 생성 건수 관리', '브랜드 안내 문구', '유족 편집 지원', 'QR 카드/스티커 제작 옵션'])}
+        ${renderBusinessPackage('프리미엄', '월 파트너 요금', ['관리자 대시보드', '지점별 템플릿', '데이터 백업/이관 지원', '디지털 헌화 기능 옵션'])}
+      </div>
+      <p class="business-price-note">
+        실제 가격은 파일럿 지점 수, 월 진행 건수, QR 인쇄물 범위에 따라 조정합니다. 초기 제안가는 영업 검증용 가설입니다.
+      </p>
+    </section>
+
+    <section class="business-section">
+      <div class="section-title">
+        <p>수익 구조</p>
+        <h2>방문자 결제 없이도 먼저 매출을 만들 수 있습니다</h2>
+      </div>
+      <div class="business-revenue-grid">
+        ${renderBusinessRevenue('초기 세팅비', '지점별 샘플 추모관, 안내 문구, QR 카드 양식을 준비합니다.')}
+        ${renderBusinessRevenue('생성 건당 과금', '장례 1건마다 QR 추모관을 만들고 유족 편집 코드를 발급합니다.')}
+        ${renderBusinessRevenue('인쇄물 마진', 'QR 카드, 스티커, 봉안당 안내판 제작 옵션을 붙입니다.')}
+        ${renderBusinessRevenue('프리미엄 보관', '대용량 사진/영상, 고급 템플릿, 장기 백업을 유족 선택 상품으로 둡니다.')}
       </div>
     </section>
 
@@ -1207,6 +1248,33 @@ function renderBusinessValue(title, body) {
   return `
     <article class="business-value-card">
       <h3>${escapeHtml(title)}</h3>
+      <p>${escapeHtml(body)}</p>
+    </article>
+  `
+}
+
+function renderBusinessProof(value, label) {
+  return `
+    <div class="business-proof-item">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>
+  `
+}
+
+function renderBusinessLaunchItem(title, body) {
+  return `
+    <article class="business-launch-card">
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(body)}</p>
+    </article>
+  `
+}
+
+function renderBusinessRevenue(title, body) {
+  return `
+    <article class="business-revenue-card">
+      <strong>${escapeHtml(title)}</strong>
       <p>${escapeHtml(body)}</p>
     </article>
   `

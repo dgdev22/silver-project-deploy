@@ -413,6 +413,34 @@ main {
   line-height: 1.65;
 }
 
+.business-proof-row {
+  display: grid;
+  width: min(100%, 620px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.business-proof-item {
+  display: grid;
+  gap: 4px;
+  border: 1px solid color-mix(in srgb, var(--hero-ink) 25%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--hero-ink) 10%, transparent);
+  padding: 12px;
+}
+
+.business-proof-item strong {
+  color: var(--hero-ink);
+  font-size: 1.25rem;
+}
+
+.business-proof-item span {
+  color: var(--hero-muted);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
 .business-qr-showcase {
   display: grid;
   align-items: center;
@@ -514,6 +542,61 @@ main {
   font-size: clamp(2rem, 4vw, 3.2rem);
 }
 
+.business-launch-grid,
+.business-revenue-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.business-launch-card,
+.business-revenue-card {
+  display: grid;
+  gap: 10px;
+  min-height: 170px;
+  align-content: start;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  padding: 18px;
+}
+
+.business-launch-card strong,
+.business-revenue-card strong {
+  color: var(--accent-strong);
+  font-size: 1.14rem;
+}
+
+.business-launch-card p,
+.business-revenue-card p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.business-script-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  border: 2px solid var(--highlight);
+  border-radius: 8px;
+  background: var(--highlight-soft);
+  padding: 18px;
+}
+
+.business-script-panel strong {
+  color: var(--ink);
+  font-size: 1.2rem;
+}
+
+.business-script-panel p {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 850;
+  line-height: 1.6;
+}
+
 .business-value-grid,
 .business-package-grid {
   display: grid;
@@ -583,6 +666,13 @@ main {
   color: var(--muted);
   font-weight: 800;
   line-height: 1.45;
+}
+
+.business-price-note {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-weight: 850;
+  line-height: 1.55;
 }
 
 .business-flow-list {
@@ -2245,6 +2335,8 @@ textarea {
   .tribute-layout,
   .business-value-grid,
   .business-package-grid,
+  .business-launch-grid,
+  .business-revenue-grid,
   .business-flow-list,
   .business-contact-grid,
   .business-inquiry-grid,
@@ -2311,6 +2403,10 @@ textarea {
 
   .business-hero-copy p {
     font-size: 1rem;
+  }
+
+  .business-proof-row {
+    grid-template-columns: 1fr;
   }
 
   .business-hero .button-row {
