@@ -645,6 +645,41 @@ main {
   line-height: 1.55;
 }
 
+.business-inquiry-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 18px;
+}
+
+.business-inquiry-form .section-title {
+  margin-bottom: 0;
+}
+
+.business-inquiry-form h3 {
+  margin: 6px 0 0;
+  font-size: 1.38rem;
+}
+
+.business-inquiry-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.business-inquiry-message {
+  margin: 0;
+  border-radius: 8px;
+  background: var(--highlight-soft);
+  color: var(--ink);
+  padding: 12px 14px;
+  font-weight: 900;
+  line-height: 1.45;
+}
+
 .hero-photo,
 .hero-card,
 .panel,
@@ -1963,7 +1998,8 @@ textarea {
   .business-value-grid,
   .business-package-grid,
   .business-flow-list,
-  .business-contact-grid {
+  .business-contact-grid,
+  .business-inquiry-grid {
     grid-template-columns: 1fr;
   }
 

@@ -1,6 +1,7 @@
 const STORAGE_KEY = 'silver-memory-demo'
 const DEFAULT_MEMORY_SLUG = 'kim-youngsu'
 const BUSINESS_INQUIRY_EMAIL = 'dgldev22@gmail.com'
+const BUSINESS_INQUIRY_DRAFT_KEY = 'silver-memory-business-inquiry-drafts'
 const API_BASE_URL =
   window.SILVER_MEMORY_API_BASE_URL ??
   (window.location.port === '5175' ? 'http://127.0.0.1:8080' : '')
@@ -361,6 +362,7 @@ const initialState = {
 }
 
 const app = document.querySelector('#app')
+let businessInquiryStatusMessage = ''
 let state = {
   ...loadState(),
   isApiBacked: false,
@@ -713,6 +715,33 @@ function businessInquiryUrl() {
   )
 
   return `mailto:${BUSINESS_INQUIRY_EMAIL}?subject=${subject}&body=${body}`
+}
+
+function loadBusinessInquiryDrafts() {
+  try {
+    const saved = window.localStorage.getItem(BUSINESS_INQUIRY_DRAFT_KEY)
+    const drafts = saved ? JSON.parse(saved) : []
+
+    return Array.isArray(drafts) ? drafts : []
+  } catch {
+    return []
+  }
+}
+
+function saveBusinessInquiryDraft(payload) {
+  const drafts = loadBusinessInquiryDrafts()
+  const nextDrafts = [
+    {
+      ...payload,
+      id: `partner-${Date.now()}`,
+      savedAt: new Date().toISOString(),
+    },
+    ...drafts,
+  ].slice(0, 20)
+
+  window.localStorage.setItem(BUSINESS_INQUIRY_DRAFT_KEY, JSON.stringify(nextDrafts))
+
+  return nextDrafts.length
 }
 
 function memoryBaseUrl() {
@@ -1074,6 +1103,7 @@ function renderBusinessLanding() {
       <p class="business-contact-note">
         결제/정산 기능은 파일럿 이후 붙이고, 초기에는 QR 추모관 생성과 유족 편집 흐름을 먼저 검증합니다.
       </p>
+      ${renderBusinessInquiryForm()}
     </section>
   `
 }
@@ -1107,6 +1137,66 @@ function renderBusinessStep(number, label) {
       <strong>${escapeHtml(number)}</strong>
       <span>${escapeHtml(label)}</span>
     </article>
+  `
+}
+
+function renderBusinessInquiryForm() {
+  return `
+    <form class="business-inquiry-form" data-business-inquiry-form>
+      <div class="section-title">
+        <p>빠른 문의 접수</p>
+        <h3>현장 상황을 남겨주시면 파일럿 범위를 좁혀볼 수 있습니다</h3>
+      </div>
+      <div class="business-inquiry-grid">
+        <label>
+          기관명
+          <input name="organizationName" autocomplete="organization" maxlength="160" required placeholder="예: OO 장례식장" />
+        </label>
+        <label>
+          담당자
+          <input name="contactName" autocomplete="name" maxlength="120" required placeholder="예: 홍길동" />
+        </label>
+        <label>
+          전화번호
+          <input name="contactPhone" autocomplete="tel" maxlength="80" placeholder="예: 010-0000-0000" />
+        </label>
+        <label>
+          이메일
+          <input name="contactEmail" type="email" autocomplete="email" maxlength="160" placeholder="예: contact@example.com" />
+        </label>
+        <label>
+          월 평균 건수
+          <select name="monthlyVolume">
+            <option value="">선택 안 함</option>
+            <option value="1-10">1~10건</option>
+            <option value="11-30">11~30건</option>
+            <option value="31-100">31~100건</option>
+            <option value="100+">100건 이상</option>
+          </select>
+        </label>
+        <label>
+          관심 상품
+          <select name="interestType">
+            <option value="pilot">파일럿</option>
+            <option value="standard">스탠다드</option>
+            <option value="premium">프리미엄</option>
+            <option value="unknown">상담 후 결정</option>
+          </select>
+        </label>
+      </div>
+      <label>
+        궁금한 점
+        <textarea name="message" rows="4" maxlength="1000" placeholder="QR 카드, 묘비 스티커, 유족 편집 지원 등 궁금한 내용을 적어주세요."></textarea>
+      </label>
+      <button type="submit" class="primary-button" data-business-inquiry-submit>
+        문의 접수하기
+      </button>
+      ${
+        businessInquiryStatusMessage
+          ? `<p class="business-inquiry-message">${escapeHtml(businessInquiryStatusMessage)}</p>`
+          : ''
+      }
+    </form>
   `
 }
 
@@ -2867,6 +2957,7 @@ function bindGlobalEvents() {
   })
 
   app.querySelector('[data-guest-form]')?.addEventListener('submit', handleGuestForm)
+  app.querySelector('[data-business-inquiry-form]')?.addEventListener('submit', handleBusinessInquiryForm)
   app.querySelectorAll('[data-owned-guest-form]').forEach((form) => {
     form.addEventListener('submit', handleOwnedGuestEditForm)
   })
@@ -3040,6 +3131,49 @@ function handleGoogleLogout() {
       includeModeration: state.activeTab === 'editor' && Boolean(state.editorToken),
       activeTab: state.activeTab,
     })
+  }
+}
+
+async function handleBusinessInquiryForm(event) {
+  event.preventDefault()
+
+  const form = event.currentTarget
+  const formData = new FormData(form)
+  const payload = {
+    organizationName: formText(formData, 'organizationName'),
+    contactName: formText(formData, 'contactName'),
+    contactPhone: formText(formData, 'contactPhone'),
+    contactEmail: formText(formData, 'contactEmail'),
+    monthlyVolume: formText(formData, 'monthlyVolume'),
+    interestType: formText(formData, 'interestType') || 'pilot',
+    message: formText(formData, 'message'),
+    sourcePath: `${window.location.pathname}${window.location.hash}`,
+  }
+  const submitButton = form.querySelector('[data-business-inquiry-submit]')
+
+  if (!payload.contactPhone && !payload.contactEmail) {
+    businessInquiryStatusMessage = '전화번호 또는 이메일 중 하나는 입력해 주세요.'
+    render()
+    return
+  }
+
+  if (submitButton) {
+    submitButton.disabled = true
+    submitButton.textContent = '접수 중'
+  }
+
+  try {
+    const result = await apiRequest('/api/memory/partner-inquiries', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    businessInquiryStatusMessage = `${result.organizationName} 문의가 접수되었습니다. 빠르게 연락드릴 준비가 되었습니다.`
+    form.reset()
+  } catch {
+    const draftCount = saveBusinessInquiryDraft(payload)
+    businessInquiryStatusMessage = `백엔드 연결 전이라 이 브라우저에 임시 저장했습니다. 임시 문의 ${draftCount}건이 보관되어 있습니다.`
+  } finally {
+    render()
   }
 }
 
