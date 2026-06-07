@@ -245,6 +245,7 @@ const ADMIN_STATUS_LABELS = {
   editor: '편집자',
   viewer: '열람자',
 }
+const ADMIN_PARTNER_INQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'archived']
 const SNAPSHOT_FIELD_LABELS = {
   displayName: '이름',
   years: '생몰연도',
@@ -915,11 +916,13 @@ function setAdminState(nextState) {
   render()
 }
 
-async function adminApiRequest(path) {
+async function adminApiRequest(path, options = {}) {
   const response = await fetch(apiUrl(path), {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
       'X-Silver-Admin-Token': adminState.token.trim(),
+      ...(options.headers ?? {}),
     },
   })
 
@@ -1306,7 +1309,7 @@ function renderAdminDashboard() {
         <h1>서비스 데이터가 건강한지 한눈에 확인합니다.</h1>
         <p>
           공공데이터 수집, 추모관 생성, 가족 권한, 방명록 승인 대기, 제휴 문의를
-          운영자가 같은 화면에서 점검하는 읽기 전용 대시보드입니다.
+          운영자가 같은 화면에서 점검하고 제휴 문의 상태를 관리하는 백오피스입니다.
         </p>
       </div>
       <form class="admin-token-form" data-admin-token-form>
@@ -1377,8 +1380,8 @@ function renderAdminDashboard() {
           <section class="admin-empty panel">
             <h2>토큰을 입력하면 운영 데이터가 열립니다.</h2>
             <p>
-              처음에는 데이터 확인용으로만 사용하고, 이후 회원 상세/제휴문의 상태 변경/환불 처리 같은
-              쓰기 기능을 단계적으로 붙이는 구성이 안전합니다.
+              현재는 데이터 확인과 제휴 문의 상태 변경을 지원합니다. 이후 회원 상세, 환불 처리,
+              공지 발송 같은 기능을 단계적으로 붙이면 운영 리스크를 낮출 수 있습니다.
             </p>
           </section>
         `
@@ -1476,7 +1479,7 @@ function renderAdminPartnerSection(items = []) {
         <h2>최근 제휴 문의</h2>
       </div>
       ${renderAdminTable(
-        ['기관', '담당자', '연락처', '관심', '상태', '접수'],
+        ['기관', '담당자', '연락처', '관심', '상태', '관리', '접수'],
         items,
         (item) => `
           <tr>
@@ -1485,11 +1488,27 @@ function renderAdminPartnerSection(items = []) {
             <td>${escapeHtml(item.contactPhone || item.contactEmail || '-')}</td>
             <td>${escapeHtml(partnerInterestLabel(item.interestType))}</td>
             <td>${renderAdminStatusPill(item.status)}</td>
+            <td>${renderAdminPartnerStatusForm(item)}</td>
             <td>${escapeHtml(formatDateTime(item.createdAt) || '-')}</td>
           </tr>
         `,
       )}
     </section>
+  `
+}
+
+function renderAdminPartnerStatusForm(item) {
+  return `
+    <form class="admin-inline-form" data-admin-partner-status-form="${escapeHtml(item.id)}">
+      <select name="status" aria-label="${escapeHtml(item.organizationName)} 상태">
+        ${ADMIN_PARTNER_INQUIRY_STATUSES.map((status) => `
+          <option value="${escapeHtml(status)}" ${status === item.status ? 'selected' : ''}>
+            ${escapeHtml(adminStatusLabel(status))}
+          </option>
+        `).join('')}
+      </select>
+      <button type="submit" class="secondary-button" ${adminState.isLoading ? 'disabled' : ''}>저장</button>
+    </form>
   `
 }
 
@@ -4188,10 +4207,49 @@ function clearAdminToken() {
   })
 }
 
+async function handleAdminPartnerStatusForm(event) {
+  event.preventDefault()
+
+  const form = event.currentTarget
+  const id = form.dataset.adminPartnerStatusForm
+  const status = new FormData(form).get('status')?.toString().trim() ?? ''
+
+  if (!id || !ADMIN_PARTNER_INQUIRY_STATUSES.includes(status)) {
+    setAdminState((current) => ({
+      ...current,
+      error: '변경할 제휴 문의 상태를 확인해주세요.',
+    }))
+    return
+  }
+
+  setAdminState((current) => ({
+    ...current,
+    isLoading: true,
+    error: '',
+  }))
+
+  try {
+    await adminApiRequest(`/api/admin/memory/partner-inquiries/${encodeURIComponent(id)}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    })
+    await loadAdminDashboard()
+  } catch (error) {
+    setAdminState((current) => ({
+      ...current,
+      isLoading: false,
+      error: error.message || '제휴 문의 상태를 변경하지 못했습니다.',
+    }))
+  }
+}
+
 function bindGlobalEvents() {
   app.querySelector('[data-admin-token-form]')?.addEventListener('submit', handleAdminTokenForm)
   app.querySelector('[data-admin-refresh]')?.addEventListener('click', () => loadAdminDashboard())
   app.querySelector('[data-admin-clear-token]')?.addEventListener('click', clearAdminToken)
+  app.querySelectorAll('[data-admin-partner-status-form]').forEach((form) => {
+    form.addEventListener('submit', handleAdminPartnerStatusForm)
+  })
 
   app
     .querySelector('[data-create-memorial-form]')

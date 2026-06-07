@@ -2642,6 +2642,24 @@ textarea {
   font-weight: 800;
 }
 
+.admin-inline-form {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 250px;
+}
+
+.admin-inline-form select {
+  min-height: 44px;
+  padding: 8px 10px;
+}
+
+.admin-inline-form .secondary-button {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
 .admin-status-pill {
   display: inline-flex;
   min-height: 32px;
@@ -2835,6 +2853,10 @@ textarea {
   }
 
   .admin-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-inline-form {
     grid-template-columns: 1fr;
   }
 
