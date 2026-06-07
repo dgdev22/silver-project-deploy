@@ -336,6 +336,8 @@ const initialState = {
       giverName: '익명 방문자',
       message: '따뜻한 마음을 남겼습니다.',
       visibility: 'anonymous',
+      paymentStatus: 'demo',
+      refundStatus: 'none',
       createdAt: '2026.06.01',
     },
   ],
@@ -1632,6 +1634,9 @@ function renderTributePanel() {
           <p>
             실제 결제 연동 전 시범 기능입니다. 지금은 과금 없이 꽃이 남는 흐름만 확인합니다.
           </p>
+          <p class="tribute-refund-note">
+            운영 결제에서는 결제 버튼 전에 환불 가능 조건과 처리 예상 시간을 먼저 안내합니다.
+          </p>
           ${state.tributeMessage ? `<p class="status-note">${escapeHtml(state.tributeMessage)}</p>` : ''}
         </div>
         <div class="tribute-tier-list" aria-label="추모 꽃 선택">
@@ -1670,6 +1675,7 @@ function renderTributeEntry(tribute) {
       <strong>${escapeHtml(tribute.tierLabel || '꽃')}</strong>
       <p>${escapeHtml(tribute.message || '따뜻한 마음을 남겼습니다.')}</p>
       <span>${escapeHtml(tribute.giverName || '익명 방문자')} · ${escapeHtml(tribute.createdAt || '')}</span>
+      ${tribute.paymentStatus === 'demo' || !tribute.paymentStatus ? '<small>시범 기록 · 실제 결제 없음</small>' : ''}
     </article>
   `
 }
@@ -3200,6 +3206,8 @@ function addTributeDraft(tierId) {
         giverName: '익명 방문자',
         message: '따뜻한 마음을 남겼습니다.',
         visibility: 'anonymous',
+        paymentStatus: 'demo',
+        refundStatus: 'none',
         createdAt,
       },
       ...(current.tributes ?? []),

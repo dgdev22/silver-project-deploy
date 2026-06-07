@@ -1085,6 +1085,11 @@ h1 {
   line-height: 1.55;
 }
 
+.tribute-refund-note {
+  border-left: 4px solid var(--highlight);
+  padding-left: 12px;
+}
+
 .tribute-tier-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1158,6 +1163,12 @@ h1 {
 .tribute-entry span {
   color: var(--muted);
   font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.tribute-entry small {
+  color: var(--accent-strong);
+  font-size: 0.82rem;
   font-weight: 900;
 }
 
