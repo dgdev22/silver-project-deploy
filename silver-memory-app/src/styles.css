@@ -2644,15 +2644,40 @@ textarea {
 
 .admin-inline-form {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) auto;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(130px, 0.7fr) minmax(180px, 0.9fr) auto;
   gap: 8px;
-  align-items: center;
-  min-width: 250px;
+  align-items: end;
+  min-width: 640px;
 }
 
+.admin-inline-form label {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 1000;
+}
+
+.admin-inline-form input,
+.admin-inline-form textarea,
+.admin-inline-form select {
+  font-size: 0.88rem;
+}
+
+.admin-inline-form input,
 .admin-inline-form select {
   min-height: 44px;
   padding: 8px 10px;
+}
+
+.admin-inline-form textarea {
+  min-height: 72px;
+  padding: 10px;
+}
+
+.admin-inline-full {
+  grid-column: 1 / -1;
 }
 
 .admin-inline-form .secondary-button {

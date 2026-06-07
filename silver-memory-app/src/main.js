@@ -814,6 +814,39 @@ function formatDateTime(value) {
   })
 }
 
+function formatDateTimeLocalInput(value) {
+  if (!value) {
+    return ''
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  const pad = (number) => String(number).padStart(2, '0')
+
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join('-') + `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function dateTimeLocalToIso(value) {
+  const normalized = value?.trim()
+  if (!normalized) {
+    return null
+  }
+
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return date.toISOString()
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -1479,7 +1512,7 @@ function renderAdminPartnerSection(items = []) {
         <h2>최근 제휴 문의</h2>
       </div>
       ${renderAdminTable(
-        ['기관', '담당자', '연락처', '관심', '상태', '관리', '접수'],
+        ['기관', '담당자', '연락처', '관심', '상태', '관리', '접수/최근 변경'],
         items,
         (item) => `
           <tr>
@@ -1489,7 +1522,11 @@ function renderAdminPartnerSection(items = []) {
             <td>${escapeHtml(partnerInterestLabel(item.interestType))}</td>
             <td>${renderAdminStatusPill(item.status)}</td>
             <td>${renderAdminPartnerStatusForm(item)}</td>
-            <td>${escapeHtml(formatDateTime(item.createdAt) || '-')}</td>
+            <td>
+              ${escapeHtml(formatDateTime(item.createdAt) || '-')}
+              <small>변경 ${escapeHtml(formatDateTime(item.updatedAt) || '-')}</small>
+              ${item.lastContactedAt ? `<small>연락 ${escapeHtml(formatDateTime(item.lastContactedAt))}</small>` : ''}
+            </td>
           </tr>
         `,
       )}
@@ -1500,13 +1537,32 @@ function renderAdminPartnerSection(items = []) {
 function renderAdminPartnerStatusForm(item) {
   return `
     <form class="admin-inline-form" data-admin-partner-status-form="${escapeHtml(item.id)}">
-      <select name="status" aria-label="${escapeHtml(item.organizationName)} 상태">
-        ${ADMIN_PARTNER_INQUIRY_STATUSES.map((status) => `
-          <option value="${escapeHtml(status)}" ${status === item.status ? 'selected' : ''}>
-            ${escapeHtml(adminStatusLabel(status))}
-          </option>
-        `).join('')}
-      </select>
+      <label>
+        <span>상태</span>
+        <select name="status" aria-label="${escapeHtml(item.organizationName)} 상태">
+          ${ADMIN_PARTNER_INQUIRY_STATUSES.map((status) => `
+            <option value="${escapeHtml(status)}" ${status === item.status ? 'selected' : ''}>
+              ${escapeHtml(adminStatusLabel(status))}
+            </option>
+          `).join('')}
+        </select>
+      </label>
+      <label>
+        <span>운영 담당</span>
+        <input name="assignedTo" value="${escapeHtml(item.assignedTo || '')}" placeholder="담당자 이름" />
+      </label>
+      <label>
+        <span>다음 연락</span>
+        <input
+          type="datetime-local"
+          name="nextFollowUpAt"
+          value="${escapeHtml(formatDateTimeLocalInput(item.nextFollowUpAt))}"
+        />
+      </label>
+      <label class="admin-inline-full">
+        <span>운영 메모</span>
+        <textarea name="adminNote" rows="3" placeholder="통화 내용, 견적 범위, 다음 액션">${escapeHtml(item.adminNote || '')}</textarea>
+      </label>
       <button type="submit" class="secondary-button" ${adminState.isLoading ? 'disabled' : ''}>저장</button>
     </form>
   `
@@ -4212,7 +4268,8 @@ async function handleAdminPartnerStatusForm(event) {
 
   const form = event.currentTarget
   const id = form.dataset.adminPartnerStatusForm
-  const status = new FormData(form).get('status')?.toString().trim() ?? ''
+  const formData = new FormData(form)
+  const status = formData.get('status')?.toString().trim() ?? ''
 
   if (!id || !ADMIN_PARTNER_INQUIRY_STATUSES.includes(status)) {
     setAdminState((current) => ({
@@ -4229,9 +4286,14 @@ async function handleAdminPartnerStatusForm(event) {
   }))
 
   try {
-    await adminApiRequest(`/api/admin/memory/partner-inquiries/${encodeURIComponent(id)}/status`, {
+    await adminApiRequest(`/api/admin/memory/partner-inquiries/${encodeURIComponent(id)}`, {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({
+        status,
+        assignedTo: formData.get('assignedTo')?.toString().trim() || null,
+        nextFollowUpAt: dateTimeLocalToIso(formData.get('nextFollowUpAt')?.toString() ?? ''),
+        adminNote: formData.get('adminNote')?.toString().trim() || null,
+      }),
     })
     await loadAdminDashboard()
   } catch (error) {
