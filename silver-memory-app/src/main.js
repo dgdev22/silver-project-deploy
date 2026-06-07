@@ -198,6 +198,7 @@ const EDIT_ACTION_LABELS = {
   announcement_updated: '공지 수정',
   announcement_deleted: '공지 삭제',
   backup_restored: '백업 복구',
+  tribute_order_updated: '헌화 주문 관리',
 }
 const TARGET_TYPE_LABELS = {
   memorial: '생애 페이지',
@@ -207,6 +208,7 @@ const TARGET_TYPE_LABELS = {
   guestbook: '방명록',
   family_member: '가족 권한',
   editor_invite: '가족 초대',
+  tribute_order: '헌화 주문',
 }
 const SNAPSHOT_FIELD_LABELS = {
   displayName: '이름',
@@ -251,6 +253,8 @@ const initialState = {
   tributeMessage: '',
   tributeCurrency: 'KRW',
   selectedTributeTierId: '',
+  tributeOrders: [],
+  tributeOrderMessage: '',
   inviteLink: '',
   editorInvites: [],
   familyMembers: [],
@@ -428,6 +432,8 @@ function saveState() {
     backupImportMessage,
     tributeMessage,
     selectedTributeTierId,
+    tributeOrderMessage,
+    tributeOrders,
     ...persistedState
   } = state
   window.localStorage.setItem(storageKey(), JSON.stringify(persistedState))
@@ -542,6 +548,10 @@ async function loadFromApi({ includeModeration = false, activeTab } = {}) {
         isPrivateBlocked: false,
       }
     })
+
+    if (includeModeration) {
+      await loadTributeOrdersForEditor({ showLoading: false })
+    }
   } catch (error) {
     const privateBlocked = error.status === 403 && !includeModeration
 
@@ -597,6 +607,35 @@ async function runGuestbookOwnerAction(action) {
   }
 }
 
+async function loadTributeOrdersForEditor({ showLoading = true } = {}) {
+  if (!state.isApiBacked) return
+
+  if (showLoading) {
+    setState((current) => ({
+      ...current,
+      tributeOrderMessage: '헌화 주문을 불러오고 있습니다.',
+    }))
+  }
+
+  try {
+    const orders = await apiRequest(`/api/memory/memorials/${currentMemorySlug()}/tribute-orders`)
+
+    setState((current) => ({
+      ...current,
+      tributeOrders: orders.map(normalizeTributeOrder),
+      tributeOrderMessage: '',
+    }))
+  } catch (error) {
+    setState((current) => ({
+      ...current,
+      tributeOrderMessage:
+        error.status === 403
+          ? '유족 코드가 있어야 헌화 주문을 볼 수 있습니다.'
+          : '헌화 주문을 불러오지 못했습니다.',
+    }))
+  }
+}
+
 function normalizeApiMemorial(data, current = state) {
   const { profile, timeline, moments, guestbook, announcements, editorInvites, familyMembers, editHistory, contentRevisions } = data
   const currentEditorLabel = data.currentEditorLabel ?? ''
@@ -641,6 +680,7 @@ function normalizeApiMemorial(data, current = state) {
     })),
     guestbook: normalizedGuestbook,
     tributes: current.tributes ?? [],
+    tributeOrders: current.tributeOrders ?? [],
     ownedGuestbookEntries: mergeOwnedGuestbookEntries(current.ownedGuestbookEntries, normalizedGuestbook),
     announcements: (announcements ?? []).map(normalizeAnnouncement),
     editorInvites: (editorInvites ?? []).map((invite) => ({
@@ -671,6 +711,38 @@ function shouldUseCurrentEditorLabel(editorName, currentEditorLabel) {
   const normalizedName = String(editorName ?? '').trim()
 
   return !normalizedName || normalizedName === '유족'
+}
+
+function normalizeTributeOrder(order) {
+  return {
+    id: String(order.id),
+    tierId: order.tierId,
+    tierLabel: order.tierLabel,
+    giverName: order.giverName || '익명 방문자',
+    message: order.message || '',
+    visibility: order.visibility || 'anonymous',
+    currency: order.currency || 'KRW',
+    amount: Number(order.amount ?? 0),
+    platformFeeAmount: Number(order.platformFeeAmount ?? 0),
+    providerFeeAmount: Number(order.providerFeeAmount ?? 0),
+    familyAmount: Number(order.familyAmount ?? 0),
+    amountLabel: formatTributeAmount(Number(order.amount ?? 0), order.currency || 'KRW'),
+    familyAmountLabel: formatTributeAmount(Number(order.familyAmount ?? 0), order.currency || 'KRW'),
+    providerOrderId: order.providerOrderId || '',
+    paymentProvider: order.paymentProvider || 'prototype',
+    paymentStatus: order.paymentStatus || 'draft',
+    refundStatus: order.refundStatus || 'none',
+    refundReason: order.refundReason || '',
+    refundedAmount: Number(order.refundedAmount ?? 0),
+    refundedAmountLabel: formatTributeAmount(Number(order.refundedAmount ?? 0), order.currency || 'KRW'),
+    requestedAt: formatDateTime(order.requestedAt),
+    paidAt: formatDateTime(order.paidAt),
+    refundRequestedAt: formatDateTime(order.refundRequestedAt),
+    refundedAt: formatDateTime(order.refundedAt),
+    canceledAt: formatDateTime(order.canceledAt),
+    createdAt: formatDateTime(order.createdAt),
+    updatedAt: formatDateTime(order.updatedAt),
+  }
 }
 
 function formatDate(value) {
@@ -2177,6 +2249,8 @@ function renderEditor() {
         </div>
       </div>
 
+      ${renderTributeOperationsPanel()}
+
       <div class="panel editor-wide">
         <div class="section-title">
           <p>편집 기록</p>
@@ -2755,6 +2829,213 @@ function renderModerationEntry(entry) {
   `
 }
 
+function renderTributeOperationsPanel() {
+  const orders = tributeOrdersForEditor()
+  const paidFamilyAmount = orders
+    .filter((order) => ['paid', 'partially_refunded'].includes(order.paymentStatus))
+    .reduce((totals, order) => {
+      const currency = order.currency || 'KRW'
+      totals[currency] = (totals[currency] ?? 0) + (order.familyAmount ?? 0)
+
+      return totals
+    }, {})
+  const refundQueueCount = orders
+    .filter((order) => ['requested', 'approved'].includes(order.refundStatus))
+    .length
+  const draftCount = orders.filter((order) => order.paymentStatus === 'draft').length
+
+  return `
+    <div class="panel editor-wide tribute-ops-panel">
+      <div class="section-title">
+        <p>헌화 정산</p>
+        <h2>주문과 환불 관리</h2>
+      </div>
+      <p class="form-note">
+        실제 결제 연동 전에는 주문 상태만 관리합니다. 결제사를 붙이면 같은 흐름에 승인, 취소, 환불 웹훅을 연결할 수 있습니다.
+      </p>
+      <div class="tribute-ops-summary">
+        <div>
+          <span>결제 준비</span>
+          <strong>${draftCount.toLocaleString('ko-KR')}건</strong>
+        </div>
+        <div>
+          <span>환불 검토</span>
+          <strong>${refundQueueCount.toLocaleString('ko-KR')}건</strong>
+        </div>
+        <div>
+          <span>유족 전달 예정</span>
+          <strong>${escapeHtml(formatTributeCurrencyTotals(paidFamilyAmount))}</strong>
+        </div>
+      </div>
+      <div class="button-row">
+        <button type="button" class="secondary-button" data-refresh-tribute-orders>
+          서버 주문 새로고침
+        </button>
+      </div>
+      ${state.tributeOrderMessage ? `<p class="status-note">${escapeHtml(state.tributeOrderMessage)}</p>` : ''}
+      <div class="tribute-order-list">
+        ${orders.length ? orders.map(renderTributeOrderEntry).join('') : '<p class="empty-text">아직 헌화 주문이 없습니다.</p>'}
+      </div>
+    </div>
+  `
+}
+
+function tributeOrdersForEditor() {
+  const serverOrders = state.tributeOrders ?? []
+  if (serverOrders.length) return serverOrders
+
+  return (state.tributes ?? []).map((tribute) => ({
+    id: String(tribute.id),
+    tierLabel: tribute.tierLabel || '꽃',
+    giverName: tribute.giverName || '익명 방문자',
+    message: tribute.message || '',
+    visibility: tribute.visibility || 'anonymous',
+    currency: tribute.currency || 'KRW',
+    amount: tribute.amount ?? 0,
+    platformFeeAmount: 0,
+    providerFeeAmount: 0,
+    familyAmount: 0,
+    amountLabel: tribute.amountLabel || '시범',
+    familyAmountLabel: '시범',
+    providerOrderId: '',
+    paymentProvider: 'local-demo',
+    paymentStatus: tribute.paymentStatus || 'demo',
+    refundStatus: tribute.refundStatus || 'none',
+    refundReason: tribute.refundReason || '',
+    refundedAmount: 0,
+    refundedAmountLabel: '',
+    createdAt: tribute.createdAt || '',
+    updatedAt: tribute.createdAt || '',
+  }))
+}
+
+function formatTributeCurrencyTotals(totals) {
+  const entries = Object.entries(totals).filter(([, amount]) => amount > 0)
+  if (!entries.length) return '0원'
+
+  return entries
+    .map(([currency, amount]) => formatTributeAmount(amount, currency))
+    .join(' / ')
+}
+
+function renderTributeOrderEntry(order) {
+  return `
+    <article class="tribute-order-entry">
+      <div class="tribute-order-heading">
+        <div>
+          <strong>${escapeHtml(order.tierLabel || '꽃')}</strong>
+          <span>${escapeHtml(order.giverName || '익명 방문자')} · ${escapeHtml(tributeVisibilityLabel(order.visibility))}</span>
+        </div>
+        <div class="tribute-status-stack">
+          <span>${escapeHtml(tributePaymentStatusLabel(order.paymentStatus))}</span>
+          <small>${escapeHtml(tributeRefundStatusLabel(order.refundStatus))}</small>
+        </div>
+      </div>
+      ${order.message ? `<p>${escapeHtml(order.message)}</p>` : '<p class="empty-text">남긴 문구가 없습니다.</p>'}
+      <dl class="tribute-order-money">
+        <div>
+          <dt>결제액</dt>
+          <dd>${escapeHtml(order.amountLabel || formatTributeAmount(order.amount ?? 0, order.currency || 'KRW'))}</dd>
+        </div>
+        <div>
+          <dt>결제 수수료</dt>
+          <dd>${escapeHtml(formatTributeAmount(order.providerFeeAmount ?? 0, order.currency || 'KRW'))}</dd>
+        </div>
+        <div>
+          <dt>운영비</dt>
+          <dd>${escapeHtml(formatTributeAmount(order.platformFeeAmount ?? 0, order.currency || 'KRW'))}</dd>
+        </div>
+        <div>
+          <dt>전달 예정</dt>
+          <dd>${escapeHtml(order.familyAmountLabel || formatTributeAmount(order.familyAmount ?? 0, order.currency || 'KRW'))}</dd>
+        </div>
+      </dl>
+      <div class="tribute-order-meta">
+        <span>주문 ${escapeHtml(order.providerOrderId || order.id)}</span>
+        <span>생성 ${escapeHtml(order.createdAt || '-')}</span>
+        ${order.paidAt ? `<span>결제 ${escapeHtml(order.paidAt)}</span>` : ''}
+        ${order.refundRequestedAt ? `<span>환불 요청 ${escapeHtml(order.refundRequestedAt)}</span>` : ''}
+        ${order.refundedAt ? `<span>환불 ${escapeHtml(order.refundedAt)}</span>` : ''}
+      </div>
+      ${order.refundReason ? `<p class="form-note">환불 메모: ${escapeHtml(order.refundReason)}</p>` : ''}
+      <div class="button-row">
+        ${tributeOrderActions(order).map((action) => `
+          <button
+            type="button"
+            class="${action.danger ? 'danger-button' : 'secondary-button'}"
+            data-tribute-order-action="${escapeHtml(action.id)}"
+            data-tribute-order-id="${escapeHtml(order.id)}"
+          >
+            ${escapeHtml(action.label)}
+          </button>
+        `).join('')}
+      </div>
+    </article>
+  `
+}
+
+function tributeOrderActions(order) {
+  if (order.paymentStatus === 'demo') return []
+
+  if (order.paymentStatus === 'draft') {
+    return [
+      { id: 'mark_paid', label: '시범 결제 완료' },
+      { id: 'cancel_order', label: '주문 취소', danger: true },
+    ]
+  }
+
+  if (order.paymentStatus === 'paid') {
+    return [
+      { id: 'request_refund', label: '환불 검토 요청' },
+      { id: 'mark_refunded', label: '환불 완료 처리', danger: true },
+    ]
+  }
+
+  if (order.paymentStatus === 'refund_requested' || order.refundStatus === 'approved') {
+    return [
+      { id: 'approve_refund', label: '환불 승인' },
+      { id: 'mark_refunded', label: '환불 완료 처리', danger: true },
+      { id: 'reject_refund', label: '환불 반려' },
+    ]
+  }
+
+  return []
+}
+
+function tributePaymentStatusLabel(status) {
+  return {
+    demo: '시범 기록',
+    draft: '결제 준비',
+    pending: '결제 대기',
+    paid: '결제 완료',
+    failed: '결제 실패',
+    canceled: '취소',
+    refund_requested: '환불 요청',
+    partially_refunded: '부분 환불',
+    refunded: '환불 완료',
+    refund_rejected: '환불 반려',
+  }[status] ?? status ?? '상태 없음'
+}
+
+function tributeRefundStatusLabel(status) {
+  return {
+    none: '환불 없음',
+    requested: '환불 검토 중',
+    approved: '환불 승인',
+    partial: '부분 환불',
+    refunded: '환불 완료',
+    rejected: '환불 반려',
+  }[status] ?? status ?? '환불 없음'
+}
+
+function tributeVisibilityLabel(visibility) {
+  return {
+    public: '이름 공개',
+    anonymous: '익명 공개',
+    private: '유족만',
+  }[visibility] ?? '익명 공개'
+}
+
 function renderEditorAccessNote() {
   if (state.currentEditorLabel) {
     return `
@@ -3145,6 +3426,14 @@ function bindGlobalEvents() {
   app
     .querySelector('[data-cancel-tribute-checkout]')
     ?.addEventListener('click', closeTributeCheckout)
+  app
+    .querySelector('[data-refresh-tribute-orders]')
+    ?.addEventListener('click', () => loadTributeOrdersForEditor())
+  app.querySelectorAll('[data-tribute-order-action]').forEach((button) => {
+    button.addEventListener('click', () => {
+      updateTributeOrderStatus(button.dataset.tributeOrderId, button.dataset.tributeOrderAction)
+    })
+  })
   app.querySelectorAll('[data-tribute-currency]').forEach((button) => {
     button.addEventListener('click', () => {
       setState((current) => ({
@@ -3416,6 +3705,7 @@ async function addTributeDraft(tierId, draft = {}) {
         tributeMessage:
           '결제 준비 주문을 만들었습니다. 아직 실제 결제와 정산은 발생하지 않았습니다.',
         selectedTributeTierId: '',
+        tributeOrders: [normalizeTributeOrder(order), ...(current.tributeOrders ?? [])],
         tributes: [
           {
             id: `tr${order.id}`,
@@ -3461,6 +3751,90 @@ async function addTributeDraft(tierId, draft = {}) {
       ...(current.tributes ?? []),
     ],
   }))
+}
+
+async function updateTributeOrderStatus(orderId, action) {
+  if (!orderId || !action) return
+
+  const order = tributeOrdersForEditor().find((item) => String(item.id) === String(orderId))
+  const refundReason = refundActionNeedsReason(action)
+    ? window.prompt('환불/취소 사유를 짧게 남겨주세요.', order?.refundReason || '')?.trim()
+    : ''
+
+  if (refundActionNeedsReason(action) && refundReason === undefined) return
+
+  if (state.isApiBacked) {
+    const ok = await runApiAction(async () => {
+      const updatedOrder = await apiRequest(
+        `/api/memory/memorials/${currentMemorySlug()}/tribute-orders/${encodeURIComponent(orderId)}/status`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            action,
+            refundReason: refundReason || null,
+            refundedAmount: action === 'mark_refunded' ? order?.amount ?? null : null,
+            editorName: currentEditorName(),
+          }),
+        },
+      )
+
+      setState((current) => ({
+        ...current,
+        tributeOrders: upsertTributeOrder(current.tributeOrders, normalizeTributeOrder(updatedOrder)),
+        tributeOrderMessage: '헌화 주문 상태를 저장했습니다.',
+      }))
+    })
+
+    if (!ok) return
+    return
+  }
+
+  setState((current) => ({
+    ...current,
+    tributes: current.tributes.map((tribute) =>
+      String(tribute.id) === String(orderId)
+        ? {
+            ...tribute,
+            paymentStatus: localTributePaymentStatus(action, tribute.paymentStatus),
+            refundStatus: localTributeRefundStatus(action, tribute.refundStatus),
+            refundReason: refundReason || tribute.refundReason,
+          }
+        : tribute,
+    ),
+    tributeOrderMessage: '로컬 시범 주문 상태를 바꿨습니다.',
+  }))
+}
+
+function upsertTributeOrder(orders = [], nextOrder) {
+  const exists = orders.some((order) => String(order.id) === String(nextOrder.id))
+
+  return exists
+    ? orders.map((order) => (String(order.id) === String(nextOrder.id) ? nextOrder : order))
+    : [nextOrder, ...orders]
+}
+
+function refundActionNeedsReason(action) {
+  return ['cancel_order', 'request_refund', 'approve_refund', 'mark_refunded', 'reject_refund'].includes(action)
+}
+
+function localTributePaymentStatus(action, currentStatus) {
+  return {
+    mark_paid: 'paid',
+    cancel_order: 'canceled',
+    request_refund: 'refund_requested',
+    approve_refund: 'refund_requested',
+    mark_refunded: 'refunded',
+    reject_refund: 'refund_rejected',
+  }[action] ?? currentStatus
+}
+
+function localTributeRefundStatus(action, currentStatus) {
+  return {
+    request_refund: 'requested',
+    approve_refund: 'approved',
+    mark_refunded: 'refunded',
+    reject_refund: 'rejected',
+  }[action] ?? currentStatus ?? 'none'
 }
 
 async function handleCreateMemorialForm(event) {
