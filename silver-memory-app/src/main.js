@@ -250,6 +250,7 @@ const initialState = {
   backupImportMessage: '',
   tributeMessage: '',
   tributeCurrency: 'KRW',
+  selectedTributeTierId: '',
   inviteLink: '',
   editorInvites: [],
   familyMembers: [],
@@ -426,6 +427,7 @@ function saveState() {
     pendingBackupImport,
     backupImportMessage,
     tributeMessage,
+    selectedTributeTierId,
     ...persistedState
   } = state
   window.localStorage.setItem(storageKey(), JSON.stringify(persistedState))
@@ -1674,6 +1676,7 @@ function renderTributePanel() {
             : '<p class="empty-text">아직 남겨진 꽃이 없습니다.</p>'
         }
       </div>
+      ${renderTributeCheckoutForm()}
     </section>
   `
 }
@@ -1705,9 +1708,74 @@ function renderTributeTier(tier, currency = currentTributeCurrency()) {
       <p>${escapeHtml(tier.description)}</p>
       <small>${escapeHtml(tributeFeeSummary(tier, currency))}</small>
       <button type="button" class="secondary-button" data-tribute-tier="${escapeHtml(tier.id)}">
-        결제 준비 시범
+        헌화 정보 입력
       </button>
     </article>
+  `
+}
+
+function renderTributeCheckoutForm() {
+  const tier = TRIBUTE_TIERS.find((item) => item.id === state.selectedTributeTierId)
+  if (!tier) return ''
+
+  const currency = currentTributeCurrency()
+  const amount = tier.amounts[currency]
+  const providerFee = estimateTributeProviderFee(amount, currency)
+  const platformFee = Math.round(amount * 0.1)
+  const familyAmount = Math.max(0, amount - providerFee - platformFee)
+
+  return `
+    <form class="tribute-checkout-form" data-tribute-checkout-form>
+      <div class="section-title">
+        <p>결제 전 확인</p>
+        <h3>${escapeHtml(tier.displayLabel)} · ${escapeHtml(formatTributeAmount(amount, currency))}</h3>
+      </div>
+      <div class="tribute-fee-breakdown" aria-label="헌화 금액 예상 정산">
+        ${renderTributeFeeItem('결제 예정액', amount, currency)}
+        ${renderTributeFeeItem('예상 결제 수수료', providerFee, currency)}
+        ${renderTributeFeeItem('서비스 운영비', platformFee, currency)}
+        ${renderTributeFeeItem('유족 전달 예정액', familyAmount, currency)}
+      </div>
+      <div class="tribute-checkout-grid">
+        <label>
+          남길 이름
+          <input name="giverName" maxlength="120" placeholder="예: 익명 방문자" />
+        </label>
+        <label>
+          공개 범위
+          <select name="visibility">
+            <option value="anonymous">익명 공개</option>
+            <option value="public">이름 공개</option>
+            <option value="private">유족에게만 표시</option>
+          </select>
+        </label>
+      </div>
+      <label>
+        짧은 마음
+        <textarea name="message" rows="3" maxlength="500" placeholder="따뜻한 마음을 남겼습니다."></textarea>
+      </label>
+      <label class="checkbox-line tribute-policy-line">
+        <input type="checkbox" name="refundPolicyAccepted" required />
+        <span>실제 결제 전에는 환불 가능 조건, 환불 불가 조건, 처리 예상 시간을 확인해야 함을 이해했습니다.</span>
+      </label>
+      <div class="button-row">
+        <button type="submit" class="primary-button" data-tribute-submit>
+          결제 준비 주문 만들기
+        </button>
+        <button type="button" class="secondary-button" data-cancel-tribute-checkout>
+          닫기
+        </button>
+      </div>
+    </form>
+  `
+}
+
+function renderTributeFeeItem(label, amount, currency) {
+  return `
+    <div>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(formatTributeAmount(amount, currency))}</strong>
+    </div>
   `
 }
 
@@ -3069,13 +3137,20 @@ function bindGlobalEvents() {
     button.addEventListener('click', downloadMemoryBackup)
   })
   app.querySelectorAll('[data-tribute-tier]').forEach((button) => {
-    button.addEventListener('click', () => addTributeDraft(button.dataset.tributeTier))
+    button.addEventListener('click', () => openTributeCheckout(button.dataset.tributeTier))
   })
+  app
+    .querySelector('[data-tribute-checkout-form]')
+    ?.addEventListener('submit', handleTributeCheckoutForm)
+  app
+    .querySelector('[data-cancel-tribute-checkout]')
+    ?.addEventListener('click', closeTributeCheckout)
   app.querySelectorAll('[data-tribute-currency]').forEach((button) => {
     button.addEventListener('click', () => {
       setState((current) => ({
         ...current,
         tributeCurrency: button.dataset.tributeCurrency ?? 'KRW',
+        selectedTributeTierId: '',
       }))
     })
   })
@@ -3266,7 +3341,51 @@ async function handleBusinessInquiryForm(event) {
   }
 }
 
-async function addTributeDraft(tierId) {
+function openTributeCheckout(tierId) {
+  if (!TRIBUTE_TIERS.some((item) => item.id === tierId)) return
+
+  setState((current) => ({
+    ...current,
+    selectedTributeTierId: tierId,
+    tributeMessage: '',
+  }))
+}
+
+function closeTributeCheckout() {
+  setState((current) => ({
+    ...current,
+    selectedTributeTierId: '',
+  }))
+}
+
+async function handleTributeCheckoutForm(event) {
+  event.preventDefault()
+
+  const form = event.currentTarget
+  const formData = new FormData(form)
+
+  if (formData.get('refundPolicyAccepted') !== 'on') {
+    setState((current) => ({
+      ...current,
+      tributeMessage: '환불 안내 확인에 동의해야 결제 준비 주문을 만들 수 있습니다.',
+    }))
+    return
+  }
+
+  const submitButton = form.querySelector('[data-tribute-submit]')
+  if (submitButton) {
+    submitButton.disabled = true
+    submitButton.textContent = '준비 중'
+  }
+
+  await addTributeDraft(state.selectedTributeTierId, {
+    giverName: formText(formData, 'giverName') || '익명 방문자',
+    message: formText(formData, 'message') || '따뜻한 마음을 남겼습니다.',
+    visibility: formText(formData, 'visibility') || 'anonymous',
+  })
+}
+
+async function addTributeDraft(tierId, draft = {}) {
   const tier = TRIBUTE_TIERS.find((item) => item.id === tierId)
   if (!tier) return
 
@@ -3285,9 +3404,9 @@ async function addTributeDraft(tierId) {
         method: 'POST',
         body: JSON.stringify({
           tierId: tier.id,
-          giverName: '익명 방문자',
-          message: '따뜻한 마음을 남겼습니다.',
-          visibility: 'anonymous',
+          giverName: draft.giverName || '익명 방문자',
+          message: draft.message || '따뜻한 마음을 남겼습니다.',
+          visibility: draft.visibility || 'anonymous',
           currency,
         }),
       })
@@ -3296,6 +3415,7 @@ async function addTributeDraft(tierId) {
         ...current,
         tributeMessage:
           '결제 준비 주문을 만들었습니다. 아직 실제 결제와 정산은 발생하지 않았습니다.',
+        selectedTributeTierId: '',
         tributes: [
           {
             id: `tr${order.id}`,
@@ -3323,14 +3443,15 @@ async function addTributeDraft(tierId) {
     ...current,
     tributeMessage:
       '시범 꽃을 남겼습니다. 실제 결제와 정산은 아직 발생하지 않았습니다.',
+    selectedTributeTierId: '',
     tributes: [
       {
         id: `tr${now.getTime()}`,
         tierId: tier.id,
         tierLabel: tier.displayLabel,
-        giverName: '익명 방문자',
-        message: '따뜻한 마음을 남겼습니다.',
-        visibility: 'anonymous',
+        giverName: draft.giverName || '익명 방문자',
+        message: draft.message || '따뜻한 마음을 남겼습니다.',
+        visibility: draft.visibility || 'anonymous',
         currency,
         amountLabel: formatTributeAmount(tier.amounts[currency], currency),
         paymentStatus: 'demo',

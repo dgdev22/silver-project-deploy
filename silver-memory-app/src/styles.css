@@ -1216,6 +1216,68 @@ h1 {
   font-weight: 900;
 }
 
+.tribute-checkout-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  border: 2px solid var(--highlight);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  padding: 18px;
+}
+
+.tribute-checkout-form .section-title {
+  margin-bottom: 0;
+}
+
+.tribute-checkout-form h3 {
+  margin: 6px 0 0;
+  font-size: 1.38rem;
+}
+
+.tribute-fee-breakdown {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.tribute-fee-breakdown div {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 12px;
+}
+
+.tribute-fee-breakdown span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.tribute-fee-breakdown strong {
+  color: var(--ink);
+  font-size: 1.12rem;
+}
+
+.tribute-checkout-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tribute-policy-line {
+  width: 100%;
+  align-items: flex-start;
+}
+
+.tribute-policy-line span {
+  color: var(--muted);
+  font-weight: 900;
+  line-height: 1.45;
+}
+
 .guest-list,
 .owned-guestbook-list,
 .moderation-list,
@@ -2054,7 +2116,9 @@ textarea {
   .business-package-grid,
   .business-flow-list,
   .business-contact-grid,
-  .business-inquiry-grid {
+  .business-inquiry-grid,
+  .tribute-fee-breakdown,
+  .tribute-checkout-grid {
     grid-template-columns: 1fr;
   }
 
