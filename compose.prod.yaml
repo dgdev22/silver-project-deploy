@@ -46,6 +46,7 @@ services:
       SPRING_DOCKER_COMPOSE_ENABLED: "false"
       JAVA_OPTS: ${JAVA_OPTS:-}
       MEMORY_UPLOAD_DIR: /app/uploads/memory
+      SILVER_ADMIN_TOKEN: ${SILVER_ADMIN_TOKEN:?set SILVER_ADMIN_TOKEN in .env.prod}
     expose:
       - "8080"
     volumes:

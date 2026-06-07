@@ -24,6 +24,8 @@ docker compose --env-file .env.prod -f compose.prod.yaml up -d postgres backend 
 
 데이터 수집과 import는 `docs/lightsail-deployment.md` 순서를 따릅니다.
 
+Silver Memory 운영 백오피스는 `/memory/#/admin`에서 열고, `.env.prod`의 `SILVER_ADMIN_TOKEN` 값으로 접근합니다.
+
 ## Smoke Tests
 
 Silver Memory 배포 후 읽기 전용 점검. 프론트 HTML, 공개 API, `announcements` 응답 계약, 유족 보호 상태를 확인합니다.

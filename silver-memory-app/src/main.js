@@ -2,6 +2,7 @@ const STORAGE_KEY = 'silver-memory-demo'
 const DEFAULT_MEMORY_SLUG = 'kim-youngsu'
 const BUSINESS_INQUIRY_EMAIL = 'dgldev22@gmail.com'
 const BUSINESS_INQUIRY_DRAFT_KEY = 'silver-memory-business-inquiry-drafts'
+const ADMIN_TOKEN_STORAGE_KEY = 'silver-memory-admin-token'
 const API_BASE_URL =
   window.SILVER_MEMORY_API_BASE_URL ??
   (window.location.port === '5175' ? 'http://127.0.0.1:8080' : '')
@@ -210,6 +211,40 @@ const TARGET_TYPE_LABELS = {
   editor_invite: '가족 초대',
   tribute_order: '헌화 주문',
 }
+const ADMIN_LIFE_INFO_TYPE_LABELS = {
+  cooling_center: '무더위쉼터',
+  meal_service: '무료급식소',
+  dementia_center: '치매안심센터',
+  public_toilet: '공중화장실',
+  learning_program: '평생학습',
+  senior_job: '노인일자리',
+  medical_facility: '의료기관',
+  pharmacy: '약국',
+  food_recipe: '식의약 레시피',
+  health_functional_food: '건강기능식품',
+  food_restaurant: '식품접객업소',
+  mobility_parking: '주차장',
+  mobility_station: '정류장',
+  tourism: '관광지',
+}
+const ADMIN_STATUS_LABELS = {
+  running: '수집 중',
+  success: '성공',
+  partial_success: '일부 성공',
+  failed: '실패',
+  new: '신규',
+  contacted: '연락 완료',
+  qualified: '검토 중',
+  archived: '보관',
+  private: '가족만',
+  link: '링크 공개',
+  public: '전체 공개',
+  active: '활성',
+  revoked: '회수',
+  owner: '소유자',
+  editor: '편집자',
+  viewer: '열람자',
+}
 const SNAPSHOT_FIELD_LABELS = {
   displayName: '이름',
   years: '생몰연도',
@@ -390,6 +425,12 @@ const initialState = {
 
 const app = document.querySelector('#app')
 let businessInquiryStatusMessage = ''
+let adminState = {
+  token: loadAdminToken(),
+  isLoading: false,
+  error: '',
+  dashboard: null,
+}
 let state = {
   ...loadState(),
   isApiBacked: false,
@@ -805,6 +846,10 @@ function memoryBusinessUrl() {
   return `${memoryBaseUrl()}#/business`
 }
 
+function memoryAdminUrl() {
+  return `${memoryBaseUrl()}#/admin`
+}
+
 function businessInquiryUrl() {
   const subject = encodeURIComponent('[Silver Memory] QR 추모관 제휴 문의')
   const body = encodeURIComponent(
@@ -848,6 +893,81 @@ function saveBusinessInquiryDraft(payload) {
   return nextDrafts.length
 }
 
+function loadAdminToken() {
+  try {
+    return window.localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function saveAdminToken(token) {
+  if (!token) {
+    window.localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY)
+    return
+  }
+
+  window.localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token)
+}
+
+function setAdminState(nextState) {
+  adminState = typeof nextState === 'function' ? nextState(adminState) : nextState
+  render()
+}
+
+async function adminApiRequest(path) {
+  const response = await fetch(apiUrl(path), {
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Silver-Admin-Token': adminState.token.trim(),
+    },
+  })
+
+  if (!response.ok) {
+    const error = new Error(response.status === 403 ? '관리자 토큰이 올바르지 않습니다.' : `API ${response.status}`)
+    error.status = response.status
+    throw error
+  }
+
+  const text = await response.text()
+
+  return text ? JSON.parse(text) : null
+}
+
+async function loadAdminDashboard() {
+  if (!adminState.token.trim()) {
+    setAdminState((current) => ({
+      ...current,
+      dashboard: null,
+      error: '관리자 토큰을 입력해주세요.',
+    }))
+    return
+  }
+
+  setAdminState((current) => ({
+    ...current,
+    isLoading: true,
+    error: '',
+  }))
+
+  try {
+    const dashboard = await adminApiRequest('/api/admin/dashboard')
+    setAdminState((current) => ({
+      ...current,
+      isLoading: false,
+      error: '',
+      dashboard,
+    }))
+  } catch (error) {
+    setAdminState((current) => ({
+      ...current,
+      isLoading: false,
+      error: error.message || '관리자 데이터를 불러오지 못했습니다.',
+      dashboard: null,
+    }))
+  }
+}
+
 function memoryBaseUrl() {
   const url = new URL(window.location.href)
 
@@ -856,6 +976,10 @@ function memoryBaseUrl() {
 
 function isBusinessRoute() {
   return window.location.hash.startsWith('#/business')
+}
+
+function isAdminRoute() {
+  return window.location.hash.startsWith('#/admin')
 }
 
 function isPartnerCreateRoute() {
@@ -871,6 +995,7 @@ function isCreateRoute() {
 
   return (
     !isBusinessRoute() &&
+    !isAdminRoute() &&
     !isPartnerCreateRoute() &&
     !isPartnerHandoffRoute() &&
     (window.location.hash.startsWith('#/new') || (!window.location.hash && !hasQuerySlug))
@@ -1041,6 +1166,31 @@ function currentEditorName() {
 function render() {
   applyDesignTheme()
 
+  if (isAdminRoute()) {
+    app.innerHTML = `
+      <header class="app-header">
+        <a class="brand" href="${escapeHtml(memoryAdminUrl())}" aria-label="Silver Memory 관리자 홈">
+          <span>Silver Memory Admin</span>
+        </a>
+        <nav class="top-nav" aria-label="관리자 메뉴">
+          ${navLink(memoryAdminUrl(), '운영 현황', true)}
+          ${navLink(memoryBusinessUrl(), '사업자 제휴', false)}
+          ${navLink(memoryPartnerCreateUrl(), '5분 생성', false)}
+          ${navLink(memoryPageUrlForSlug(DEFAULT_MEMORY_SLUG), '샘플 추모관', false)}
+        </nav>
+        <div class="storage-status ${adminState.dashboard ? 'is-live' : 'is-local'}">
+          ${adminState.dashboard ? '관리자 연결' : '토큰 필요'}
+        </div>
+      </header>
+
+      <main class="admin-main">
+        ${renderAdminDashboard()}
+      </main>
+    `
+    bindGlobalEvents()
+    return
+  }
+
   if (isBusinessRoute()) {
     app.innerHTML = `
       <header class="app-header">
@@ -1144,6 +1294,304 @@ function render() {
   `
 
   bindGlobalEvents()
+}
+
+function renderAdminDashboard() {
+  const dashboard = adminState.dashboard
+
+  return `
+    <section class="admin-hero">
+      <div>
+        <span class="eyebrow">운영 백오피스</span>
+        <h1>서비스 데이터가 건강한지 한눈에 확인합니다.</h1>
+        <p>
+          공공데이터 수집, 추모관 생성, 가족 권한, 방명록 승인 대기, 제휴 문의를
+          운영자가 같은 화면에서 점검하는 읽기 전용 대시보드입니다.
+        </p>
+      </div>
+      <form class="admin-token-form" data-admin-token-form>
+        <label>
+          관리자 토큰
+          <input
+            type="password"
+            name="adminToken"
+            autocomplete="current-password"
+            placeholder="local-admin"
+            value="${escapeHtml(adminState.token)}"
+          />
+        </label>
+        <div class="button-row">
+          <button type="submit" class="primary-button" ${adminState.isLoading ? 'disabled' : ''}>
+            ${adminState.isLoading ? '불러오는 중' : '대시보드 불러오기'}
+          </button>
+          <button type="button" class="secondary-button" data-admin-refresh ${adminState.isLoading ? 'disabled' : ''}>
+            새로고침
+          </button>
+          <button type="button" class="secondary-button" data-admin-clear-token>
+            토큰 지우기
+          </button>
+        </div>
+        <p class="form-note">운영 서버에서는 SILVER_ADMIN_TOKEN으로 설정한 값이 필요합니다. 공용 PC에서는 확인 후 토큰을 지워주세요.</p>
+      </form>
+    </section>
+
+    ${adminState.error ? `<p class="status-note">${escapeHtml(adminState.error)}</p>` : ''}
+
+    ${
+      dashboard
+        ? `
+          <section class="admin-section">
+            <div class="section-title">
+              <span class="eyebrow">요약</span>
+              <h2>오늘의 운영 체크</h2>
+              <p>생성 시각 ${escapeHtml(formatDateTime(dashboard.generatedAt) || '-')}</p>
+            </div>
+            <div class="admin-stat-grid">
+              ${renderAdminMetric('생활정보', dashboard.summary.lifeInfoCount, `${formatAdminNumber(dashboard.summary.activeLifeInfoCount)}건 활성`)}
+              ${renderAdminMetric('좌표 누락', dashboard.summary.missingCoordinateCount, '지도 노출 전 확인')}
+              ${renderAdminMetric('수집 실패', dashboard.summary.collectorFailureCount, '원천 API/키 점검')}
+              ${renderAdminMetric('추모관', dashboard.summary.memorialCount, '생성된 전체 추모관')}
+              ${renderAdminMetric('신규 제휴문의', dashboard.summary.newPartnerInquiryCount, '영업 팔로업 필요')}
+              ${renderAdminMetric('방명록 대기', dashboard.summary.pendingGuestbookCount, '유족 승인 필요')}
+              ${renderAdminMetric('가족 권한', dashboard.summary.activeFamilyMemberCount, '활성 회원 권한')}
+              ${renderAdminMetric('헌화/환불', dashboard.summary.tributeRefundQueueCount, `${formatAdminNumber(dashboard.summary.tributeDraftCount)}건 결제 초안`)}
+            </div>
+          </section>
+
+          <div class="admin-grid">
+            ${renderAdminLifeInfoSection(dashboard.lifeInfoTypes)}
+            ${renderAdminRegionSection(dashboard.regions)}
+          </div>
+
+          <div class="admin-grid">
+            ${renderAdminCollectorSection(dashboard.collectorRuns)}
+            ${renderAdminPartnerSection(dashboard.partnerInquiries)}
+          </div>
+
+          <div class="admin-grid">
+            ${renderAdminMemorialSection(dashboard.memorials)}
+            ${renderAdminFamilySection(dashboard.familyMembers)}
+          </div>
+        `
+        : `
+          <section class="admin-empty panel">
+            <h2>토큰을 입력하면 운영 데이터가 열립니다.</h2>
+            <p>
+              처음에는 데이터 확인용으로만 사용하고, 이후 회원 상세/제휴문의 상태 변경/환불 처리 같은
+              쓰기 기능을 단계적으로 붙이는 구성이 안전합니다.
+            </p>
+          </section>
+        `
+    }
+  `
+}
+
+function renderAdminMetric(label, value, helper) {
+  return `
+    <article class="admin-stat-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${formatAdminNumber(value)}</strong>
+      <small>${escapeHtml(helper)}</small>
+    </article>
+  `
+}
+
+function renderAdminLifeInfoSection(items = []) {
+  return `
+    <section class="admin-section">
+      <div class="section-title">
+        <span class="eyebrow">공공데이터</span>
+        <h2>데이터 타입별 품질</h2>
+      </div>
+      ${renderAdminTable(
+        ['유형', '전체', '활성', '좌표 누락', '전화 누락', '최근 수집'],
+        items,
+        (item) => `
+          <tr>
+            <td>${escapeHtml(adminLifeInfoTypeLabel(item.type))}<small>${escapeHtml(item.type)}</small></td>
+            <td>${formatAdminNumber(item.totalCount)}</td>
+            <td>${formatAdminNumber(item.activeCount)}</td>
+            <td>${formatAdminNumber(item.missingCoordinateCount)}</td>
+            <td>${formatAdminNumber(item.missingPhoneCount)}</td>
+            <td>${escapeHtml(formatDateTime(item.latestCollectedAt) || '-')}</td>
+          </tr>
+        `,
+      )}
+    </section>
+  `
+}
+
+function renderAdminRegionSection(items = []) {
+  return `
+    <section class="admin-section">
+      <div class="section-title">
+        <span class="eyebrow">지역</span>
+        <h2>많이 수집된 지역</h2>
+      </div>
+      ${renderAdminTable(
+        ['지역', '건수', '최근 수집'],
+        items,
+        (item) => `
+          <tr>
+            <td>${escapeHtml(item.region)}</td>
+            <td>${formatAdminNumber(item.totalCount)}</td>
+            <td>${escapeHtml(formatDateTime(item.latestCollectedAt) || '-')}</td>
+          </tr>
+        `,
+      )}
+    </section>
+  `
+}
+
+function renderAdminCollectorSection(items = []) {
+  return `
+    <section class="admin-section">
+      <div class="section-title">
+        <span class="eyebrow">수집기</span>
+        <h2>최근 수집 실행</h2>
+      </div>
+      ${renderAdminTable(
+        ['소스', '유형', '상태', '수집/저장/수정/실패', '시작', '메시지'],
+        items,
+        (item) => `
+          <tr>
+            <td>${escapeHtml(item.sourceName)}</td>
+            <td>${escapeHtml(adminLifeInfoTypeLabel(item.dataType))}</td>
+            <td>${renderAdminStatusPill(item.status)}</td>
+            <td>${formatAdminNumber(item.fetchedCount)} / ${formatAdminNumber(item.insertedCount)} / ${formatAdminNumber(item.updatedCount)} / ${formatAdminNumber(item.failedCount)}</td>
+            <td>${escapeHtml(formatDateTime(item.startedAt) || '-')}</td>
+            <td>${escapeHtml(item.errorMessage || item.message || '-')}</td>
+          </tr>
+        `,
+      )}
+    </section>
+  `
+}
+
+function renderAdminPartnerSection(items = []) {
+  return `
+    <section class="admin-section">
+      <div class="section-title">
+        <span class="eyebrow">영업</span>
+        <h2>최근 제휴 문의</h2>
+      </div>
+      ${renderAdminTable(
+        ['기관', '담당자', '연락처', '관심', '상태', '접수'],
+        items,
+        (item) => `
+          <tr>
+            <td>${escapeHtml(item.organizationName)}</td>
+            <td>${escapeHtml(item.contactName)}</td>
+            <td>${escapeHtml(item.contactPhone || item.contactEmail || '-')}</td>
+            <td>${escapeHtml(partnerInterestLabel(item.interestType))}</td>
+            <td>${renderAdminStatusPill(item.status)}</td>
+            <td>${escapeHtml(formatDateTime(item.createdAt) || '-')}</td>
+          </tr>
+        `,
+      )}
+    </section>
+  `
+}
+
+function renderAdminMemorialSection(items = []) {
+  return `
+    <section class="admin-section">
+      <div class="section-title">
+        <span class="eyebrow">Memory</span>
+        <h2>최근 추모관</h2>
+      </div>
+      ${renderAdminTable(
+        ['이름', '공개', '템플릿', '가족/대기/헌화', '생성'],
+        items,
+        (item) => `
+          <tr>
+            <td>
+              <a href="${escapeHtml(memoryPageUrlForSlug(item.slug))}">${escapeHtml(item.displayName)}</a>
+              <small>${escapeHtml(item.slug)}</small>
+            </td>
+            <td>${renderAdminStatusPill(item.visibility)}</td>
+            <td>${escapeHtml(adminTemplateLabel(item.pageTemplate))}</td>
+            <td>${formatAdminNumber(item.activeFamilyMemberCount)} / ${formatAdminNumber(item.pendingGuestbookCount)} / ${formatAdminNumber(item.tributeOrderCount)}</td>
+            <td>${escapeHtml(formatDateTime(item.createdAt) || '-')}</td>
+          </tr>
+        `,
+      )}
+    </section>
+  `
+}
+
+function renderAdminFamilySection(items = []) {
+  return `
+    <section class="admin-section">
+      <div class="section-title">
+        <span class="eyebrow">회원/권한</span>
+        <h2>최근 가족 권한</h2>
+      </div>
+      ${renderAdminTable(
+        ['추모관', '사용자', '역할', '상태', '등록'],
+        items,
+        (item) => `
+          <tr>
+            <td>${escapeHtml(item.memorialName)}<small>${escapeHtml(item.memorialSlug)}</small></td>
+            <td>${escapeHtml(item.displayName || item.email || item.userId)}</td>
+            <td>${escapeHtml(adminStatusLabel(item.role))}</td>
+            <td>${renderAdminStatusPill(item.status)}</td>
+            <td>${escapeHtml(formatDateTime(item.createdAt) || '-')}</td>
+          </tr>
+        `,
+      )}
+    </section>
+  `
+}
+
+function renderAdminTable(headers, rows = [], rowRenderer) {
+  if (!rows.length) {
+    return `<p class="empty-text">아직 표시할 데이터가 없습니다.</p>`
+  }
+
+  return `
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>
+        </thead>
+        <tbody>
+          ${rows.map(rowRenderer).join('')}
+        </tbody>
+      </table>
+    </div>
+  `
+}
+
+function renderAdminStatusPill(status) {
+  return `<span class="admin-status-pill is-${escapeHtml(status)}">${escapeHtml(adminStatusLabel(status))}</span>`
+}
+
+function formatAdminNumber(value) {
+  return new Intl.NumberFormat('ko-KR').format(Number(value ?? 0))
+}
+
+function adminStatusLabel(value) {
+  return ADMIN_STATUS_LABELS[value] ?? value ?? '-'
+}
+
+function adminLifeInfoTypeLabel(value) {
+  return ADMIN_LIFE_INFO_TYPE_LABELS[value] ?? value ?? '-'
+}
+
+function adminTemplateLabel(value) {
+  return PAGE_TEMPLATES.find((template) => template.id === value)?.label ?? value ?? '-'
+}
+
+function partnerInterestLabel(value) {
+  const labels = {
+    pilot: '파일럿',
+    standard: '스탠다드',
+    premium: '프리미엄',
+    print: 'QR 인쇄물',
+  }
+
+  return labels[value] ?? value ?? '-'
 }
 
 function renderBusinessLanding() {
@@ -3706,7 +4154,45 @@ function buildLocalEditEvent(actionType, summary) {
   }
 }
 
+function handleAdminTokenForm(event) {
+  event.preventDefault()
+
+  const token = new FormData(event.currentTarget).get('adminToken')?.toString().trim() ?? ''
+  if (!token) {
+    setAdminState((current) => ({
+      ...current,
+      token: '',
+      dashboard: null,
+      error: '관리자 토큰을 입력해주세요.',
+    }))
+    saveAdminToken('')
+    return
+  }
+
+  adminState = {
+    ...adminState,
+    token,
+    error: '',
+  }
+  saveAdminToken(token)
+  loadAdminDashboard()
+}
+
+function clearAdminToken() {
+  saveAdminToken('')
+  setAdminState({
+    token: '',
+    isLoading: false,
+    error: '',
+    dashboard: null,
+  })
+}
+
 function bindGlobalEvents() {
+  app.querySelector('[data-admin-token-form]')?.addEventListener('submit', handleAdminTokenForm)
+  app.querySelector('[data-admin-refresh]')?.addEventListener('click', () => loadAdminDashboard())
+  app.querySelector('[data-admin-clear-token]')?.addEventListener('click', clearAdminToken)
+
   app
     .querySelector('[data-create-memorial-form]')
     ?.addEventListener('submit', handleCreateMemorialForm)
@@ -6456,6 +6942,13 @@ function reloadCurrentRoute() {
 
   render()
 
+  if (isAdminRoute()) {
+    if (adminState.token) {
+      loadAdminDashboard()
+    }
+    return
+  }
+
   if (!isCreateRoute()) {
     loadFromApi({
       includeModeration: state.activeTab === 'editor' && Boolean(state.editorToken),
@@ -6467,7 +6960,11 @@ function reloadCurrentRoute() {
 window.addEventListener('hashchange', reloadCurrentRoute)
 
 render()
-if (!isCreateRoute()) {
+if (isAdminRoute()) {
+  if (adminState.token) {
+    loadAdminDashboard()
+  }
+} else if (!isCreateRoute()) {
   loadFromApi({
     includeModeration: state.activeTab === 'editor' && Boolean(state.editorToken),
     activeTab: state.activeTab,

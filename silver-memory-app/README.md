@@ -27,6 +27,7 @@
 - 기억 대상: 사람, 반려동물
 - 페이지 구성: 기록관형, 앨범형, 편지형, 사진첩형, 스토리형
 - AI 태그 초안: 생애 글, 공지사항, 방명록을 바탕으로 키워드 후보를 만들고 유족이 승인
+- 운영 백오피스: `#/admin`에서 공공데이터 수집 현황, 추모관, 가족 권한, 방명록 대기, 제휴 문의 요약 확인
 
 백엔드가 켜져 있으면 `/api/memory`를 통해 PostgreSQL에 저장합니다. 백엔드 연결이 없으면 브라우저 `localStorage`에 임시 저장되는 프론트엔드 MVP로 동작합니다.
 
@@ -84,6 +85,7 @@ PATCH /api/memory/family-members/{id}
 PATCH /api/memory/guestbook/{id}/owner
 DELETE /api/memory/guestbook/{id}/owner
 PATCH /api/memory/guestbook/{id}
+GET /api/admin/dashboard
 ```
 
 유족 편집 탭에서 샘플 코드는 `demo-family-token`입니다. 보호되는 API에는 다음 헤더가 붙습니다.
@@ -115,9 +117,12 @@ MEMORY_CREATION_RATE_LIMIT_MAX=5
 MEMORY_CREATION_RATE_LIMIT_WINDOW_MINUTES=60
 MEMORY_GUESTBOOK_RATE_LIMIT_MAX=20
 MEMORY_GUESTBOOK_RATE_LIMIT_WINDOW_MINUTES=60
+SILVER_ADMIN_TOKEN=긴_관리자_토큰
 ```
 
 `MEMORY_CREATION_RATE_LIMIT_MAX=0` 또는 `MEMORY_GUESTBOOK_RATE_LIMIT_MAX=0`으로 두면 해당 제한을 임시로 끌 수 있습니다.
+
+운영 백오피스는 `http://127.0.0.1:5175/#/admin` 또는 운영 경로 `/memory/#/admin`에서 열 수 있습니다. 로컬 기본 관리자 토큰은 `local-admin`이고, 운영에서는 반드시 `SILVER_ADMIN_TOKEN`을 별도로 설정합니다. 백오피스는 현재 읽기 전용이며, 공공데이터 타입별 품질, 최근 수집 실행, 최근 추모관, 가족 권한, 제휴 문의를 확인합니다.
 
 ## 디자인 변경
 
