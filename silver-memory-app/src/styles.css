@@ -2685,6 +2685,34 @@ textarea {
   padding: 0 12px;
 }
 
+.admin-family-form {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(110px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  min-width: 360px;
+}
+
+.admin-family-form label {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 1000;
+}
+
+.admin-family-form select {
+  min-height: 44px;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+}
+
+.admin-family-form .secondary-button {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
 .admin-status-pill {
   display: inline-flex;
   min-height: 32px;
@@ -2882,6 +2910,10 @@ textarea {
   }
 
   .admin-inline-form {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-family-form {
     grid-template-columns: 1fr;
   }
 

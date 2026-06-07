@@ -246,6 +246,8 @@ const ADMIN_STATUS_LABELS = {
   viewer: '열람자',
 }
 const ADMIN_PARTNER_INQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'archived']
+const ADMIN_FAMILY_ROLES = ['owner', 'editor', 'viewer']
+const ADMIN_FAMILY_STATUSES = ['active', 'revoked']
 const SNAPSHOT_FIELD_LABELS = {
   displayName: '이름',
   years: '생몰연도',
@@ -1603,7 +1605,7 @@ function renderAdminFamilySection(items = []) {
         <h2>최근 가족 권한</h2>
       </div>
       ${renderAdminTable(
-        ['추모관', '사용자', '역할', '상태', '등록'],
+        ['추모관', '사용자', '역할', '상태', '관리', '등록'],
         items,
         (item) => `
           <tr>
@@ -1611,11 +1613,40 @@ function renderAdminFamilySection(items = []) {
             <td>${escapeHtml(item.displayName || item.email || item.userId)}</td>
             <td>${escapeHtml(adminStatusLabel(item.role))}</td>
             <td>${renderAdminStatusPill(item.status)}</td>
+            <td>${renderAdminFamilyMemberForm(item)}</td>
             <td>${escapeHtml(formatDateTime(item.createdAt) || '-')}</td>
           </tr>
         `,
       )}
     </section>
+  `
+}
+
+function renderAdminFamilyMemberForm(item) {
+  return `
+    <form class="admin-family-form" data-admin-family-member-form="${escapeHtml(item.id)}">
+      <label>
+        <span>역할</span>
+        <select name="role" aria-label="${escapeHtml(item.displayName || item.email || item.userId)} 역할">
+          ${ADMIN_FAMILY_ROLES.map((role) => `
+            <option value="${escapeHtml(role)}" ${role === item.role ? 'selected' : ''}>
+              ${escapeHtml(adminStatusLabel(role))}
+            </option>
+          `).join('')}
+        </select>
+      </label>
+      <label>
+        <span>상태</span>
+        <select name="status" aria-label="${escapeHtml(item.displayName || item.email || item.userId)} 상태">
+          ${ADMIN_FAMILY_STATUSES.map((status) => `
+            <option value="${escapeHtml(status)}" ${status === item.status ? 'selected' : ''}>
+              ${escapeHtml(adminStatusLabel(status))}
+            </option>
+          `).join('')}
+        </select>
+      </label>
+      <button type="submit" class="secondary-button" ${adminState.isLoading ? 'disabled' : ''}>저장</button>
+    </form>
   `
 }
 
@@ -4305,12 +4336,53 @@ async function handleAdminPartnerStatusForm(event) {
   }
 }
 
+async function handleAdminFamilyMemberForm(event) {
+  event.preventDefault()
+
+  const form = event.currentTarget
+  const id = form.dataset.adminFamilyMemberForm
+  const formData = new FormData(form)
+  const role = formData.get('role')?.toString().trim() ?? ''
+  const status = formData.get('status')?.toString().trim() ?? ''
+
+  if (!id || !ADMIN_FAMILY_ROLES.includes(role) || !ADMIN_FAMILY_STATUSES.includes(status)) {
+    setAdminState((current) => ({
+      ...current,
+      error: '변경할 가족 권한 정보를 확인해주세요.',
+    }))
+    return
+  }
+
+  setAdminState((current) => ({
+    ...current,
+    isLoading: true,
+    error: '',
+  }))
+
+  try {
+    await adminApiRequest(`/api/admin/memory/family-members/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role, status }),
+    })
+    await loadAdminDashboard()
+  } catch (error) {
+    setAdminState((current) => ({
+      ...current,
+      isLoading: false,
+      error: error.message || '가족 권한을 변경하지 못했습니다.',
+    }))
+  }
+}
+
 function bindGlobalEvents() {
   app.querySelector('[data-admin-token-form]')?.addEventListener('submit', handleAdminTokenForm)
   app.querySelector('[data-admin-refresh]')?.addEventListener('click', () => loadAdminDashboard())
   app.querySelector('[data-admin-clear-token]')?.addEventListener('click', clearAdminToken)
   app.querySelectorAll('[data-admin-partner-status-form]').forEach((form) => {
     form.addEventListener('submit', handleAdminPartnerStatusForm)
+  })
+  app.querySelectorAll('[data-admin-family-member-form]').forEach((form) => {
+    form.addEventListener('submit', handleAdminFamilyMemberForm)
   })
 
   app
