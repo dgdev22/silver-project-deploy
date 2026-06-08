@@ -244,6 +244,9 @@ const ADMIN_STATUS_LABELS = {
   owner: '소유자',
   editor: '편집자',
   viewer: '열람자',
+  visible: '공개',
+  hidden: '숨김',
+  deleted: '작성자 삭제',
 }
 const ADMIN_PARTNER_INQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'archived']
 const ADMIN_FAMILY_ROLES = ['owner', 'editor', 'viewer']
@@ -451,6 +454,13 @@ let adminState = {
   },
   memorialResults: [],
   memorialSearchLoaded: false,
+  visitReviewSearch: {
+    keyword: '',
+    moderationStatus: '',
+    limit: '50',
+  },
+  visitReviewResults: [],
+  visitReviewSearchLoaded: false,
 }
 let state = {
   ...loadState(),
@@ -916,6 +926,10 @@ function memoryAdminMemorialsUrl() {
   return `${memoryBaseUrl()}#/admin/memorials`
 }
 
+function memoryAdminReviewsUrl() {
+  return `${memoryBaseUrl()}#/admin/reviews`
+}
+
 function memoryAdminDataUrl() {
   return `${memoryBaseUrl()}#/admin/data`
 }
@@ -1129,6 +1143,60 @@ async function loadAdminMemorials(search = adminState.memorialSearch) {
   }
 }
 
+async function loadAdminVisitReviews(search = adminState.visitReviewSearch) {
+  if (!adminState.token.trim()) {
+    setAdminState((current) => ({
+      ...current,
+      visitReviewResults: [],
+      visitReviewSearchLoaded: false,
+      error: '관리자 토큰을 입력해주세요.',
+    }))
+    return
+  }
+
+  const params = new URLSearchParams()
+  if (search.keyword?.trim()) params.set('keyword', search.keyword.trim())
+  if (search.moderationStatus?.trim()) params.set('moderationStatus', search.moderationStatus.trim())
+  params.set('limit', String(Number(search.limit) || 50))
+
+  setAdminState((current) => ({
+    ...current,
+    visitReviewSearch: search,
+    isLoading: true,
+    error: '',
+  }))
+
+  try {
+    const reviews = await adminApiRequest(`/api/admin/visit-reviews?${params.toString()}`)
+    setAdminState((current) => ({
+      ...current,
+      isLoading: false,
+      error: '',
+      visitReviewResults: reviews,
+      visitReviewSearchLoaded: true,
+    }))
+  } catch (error) {
+    setAdminState((current) => ({
+      ...current,
+      isLoading: false,
+      error: error.message || '방문 후기를 조회하지 못했습니다.',
+      visitReviewResults: [],
+      visitReviewSearchLoaded: false,
+    }))
+  }
+}
+
+async function loadAdminRouteData() {
+  if (!adminState.token.trim()) {
+    return
+  }
+
+  await loadAdminDashboard()
+  if (currentAdminSection() === 'reviews') {
+    await loadAdminVisitReviews()
+  }
+}
+
 function memoryBaseUrl() {
   const url = new URL(window.location.href)
 
@@ -1147,6 +1215,7 @@ function currentAdminSection() {
   if (window.location.hash.startsWith('#/admin/members')) return 'members'
   if (window.location.hash.startsWith('#/admin/partners')) return 'partners'
   if (window.location.hash.startsWith('#/admin/memorials')) return 'memorials'
+  if (window.location.hash.startsWith('#/admin/reviews')) return 'reviews'
   if (window.location.hash.startsWith('#/admin/data')) return 'data'
 
   return 'overview'
@@ -1535,6 +1604,7 @@ function renderAdminSectionMenu(current) {
     ['members', memoryAdminMembersUrl(), '회원·권한', '가족 계정 검색과 권한 관리'],
     ['partners', memoryAdminPartnersUrl(), '제휴 문의', '영업 상태와 다음 연락 관리'],
     ['memorials', memoryAdminMemorialsUrl(), '추모관', '생성된 전시관과 공개 상태 확인'],
+    ['reviews', memoryAdminReviewsUrl(), '방문 후기', '관광 후기와 현장 체감 검토'],
     ['data', memoryAdminDataUrl(), '데이터 수집', '공공데이터 품질과 수집기 확인'],
   ]
 
@@ -1561,6 +1631,10 @@ function renderAdminSectionContent(section, dashboard) {
 
   if (section === 'memorials') {
     return renderAdminMemorialLookup(dashboard.memorials)
+  }
+
+  if (section === 'reviews') {
+    return renderAdminVisitReviewLookup()
   }
 
   if (section === 'data') {
@@ -1857,6 +1931,125 @@ function renderAdminMemorialForm(item) {
             </option>
           `).join('')}
         </select>
+      </label>
+      <button type="submit" class="secondary-button" ${adminState.isLoading ? 'disabled' : ''}>저장</button>
+    </form>
+  `
+}
+
+function renderAdminVisitReviewLookup() {
+  const search = adminState.visitReviewSearch
+  const title = adminState.visitReviewSearchLoaded ? '방문 후기 검색 결과' : '방문 후기 조회'
+
+  return `
+    <section class="admin-section">
+      <div class="section-title">
+        <span class="eyebrow">방문 후기 검토</span>
+        <h2>공공데이터 점수와 현장 체감 후기 관리</h2>
+        <p>장소명, 지역, 작성자, 후기 내용으로 검색하고 부적절한 후기는 숨길 수 있습니다.</p>
+      </div>
+      <form class="admin-search-form" data-admin-visit-review-search-form>
+        <label>
+          검색어
+          <input name="keyword" value="${escapeHtml(search.keyword)}" placeholder="장소, 지역, 작성자, 후기 내용" />
+        </label>
+        <label>
+          상태
+          <select name="moderationStatus">
+            <option value="">전체 상태</option>
+            ${['visible', 'hidden', 'deleted'].map((status) => `
+              <option value="${escapeHtml(status)}" ${status === search.moderationStatus ? 'selected' : ''}>
+                ${escapeHtml(adminStatusLabel(status))}
+              </option>
+            `).join('')}
+          </select>
+        </label>
+        <label>
+          표시 개수
+          <select name="limit">
+            ${['20', '50', '100', '200'].map((limit) => `
+              <option value="${limit}" ${limit === search.limit ? 'selected' : ''}>${limit}개</option>
+            `).join('')}
+          </select>
+        </label>
+        <button type="submit" class="primary-button" ${adminState.isLoading ? 'disabled' : ''}>
+          ${adminState.isLoading ? '조회 중' : '후기 조회'}
+        </button>
+      </form>
+    </section>
+    ${renderAdminVisitReviewSection(adminState.visitReviewResults, title)}
+  `
+}
+
+function renderAdminVisitReviewSection(items = [], title = '방문 후기') {
+  return `
+    <section class="admin-section">
+      <div class="section-title">
+        <span class="eyebrow">Tour Review</span>
+        <h2>${escapeHtml(title)}</h2>
+      </div>
+      ${renderAdminTable(
+        ['장소', '후기', '체감', '상태', '관리', '작성'],
+        items,
+        (item) => {
+          const review = item.review ?? {}
+
+          return `
+            <tr>
+              <td>
+                ${escapeHtml(item.lifeInfoTitle || '-')}
+                <small>${escapeHtml([item.region, item.category].filter(Boolean).join(' · ') || item.sourceName || '-')}</small>
+                ${item.address ? `<small>${escapeHtml(item.address)}</small>` : ''}
+                <small>공공데이터 예상 ${formatAdminNumber(item.recommendationScore)}점</small>
+              </td>
+              <td>
+                ${escapeHtml(review.reviewerName || '방문자')}
+                <small>${escapeHtml(review.memo || '한 줄 후기 없음')}</small>
+              </td>
+              <td>
+                ${formatAdminNumber(Number(review.overallRating || 0))}/5
+                <small>${escapeHtml(review.walkingBurdenLabel || '-')}</small>
+                <small>${escapeHtml(review.seniorFriendlyLabel || '-')}</small>
+              </td>
+              <td>
+                ${renderAdminStatusPill(review.moderationStatus || 'visible')}
+                ${review.hiddenReason ? `<small>${escapeHtml(review.hiddenReason)}</small>` : ''}
+              </td>
+              <td>${renderAdminVisitReviewModerationForm(review)}</td>
+              <td>
+                ${escapeHtml(formatDateTime(review.createdAt) || '-')}
+                ${review.visitMonth ? `<small>방문 ${escapeHtml(review.visitMonth)}</small>` : ''}
+              </td>
+            </tr>
+          `
+        },
+      )}
+    </section>
+  `
+}
+
+function renderAdminVisitReviewModerationForm(review) {
+  const currentStatus = review.moderationStatus || 'visible'
+
+  if (currentStatus === 'deleted') {
+    return '<p class="form-note">작성자가 삭제한 후기입니다.</p>'
+  }
+
+  return `
+    <form class="admin-family-form" data-admin-visit-review-form="${escapeHtml(review.id)}">
+      <label>
+        <span>상태</span>
+        <select name="moderationStatus" aria-label="후기 ${escapeHtml(review.id)} 상태">
+          ${['visible', 'hidden'].map((status) => `
+            <option value="${escapeHtml(status)}" ${status === currentStatus ? 'selected' : ''}>
+              ${escapeHtml(adminStatusLabel(status))}
+            </option>
+          `).join('')}
+        </select>
+      </label>
+      <label>
+        <span>사유</span>
+        <input name="hiddenReason" value="${escapeHtml(review.hiddenReason || '')}" placeholder="예: 부적절한 표현" />
       </label>
       <button type="submit" class="secondary-button" ${adminState.isLoading ? 'disabled' : ''}>저장</button>
     </form>
@@ -4603,7 +4796,7 @@ function handleAdminTokenForm(event) {
     error: '',
   }
   saveAdminToken(token)
-  loadAdminDashboard()
+  loadAdminRouteData()
 }
 
 function clearAdminToken() {
@@ -4630,6 +4823,13 @@ function clearAdminToken() {
     },
     memorialResults: [],
     memorialSearchLoaded: false,
+    visitReviewSearch: {
+      keyword: '',
+      moderationStatus: '',
+      limit: '50',
+    },
+    visitReviewResults: [],
+    visitReviewSearchLoaded: false,
   })
 }
 
@@ -4789,9 +4989,67 @@ async function handleAdminMemorialSearchForm(event) {
   await loadAdminMemorials(search)
 }
 
+async function handleAdminVisitReviewSearchForm(event) {
+  event.preventDefault()
+
+  const formData = new FormData(event.currentTarget)
+  const search = {
+    keyword: formData.get('keyword')?.toString().trim() ?? '',
+    moderationStatus: formData.get('moderationStatus')?.toString().trim() ?? '',
+    limit: formData.get('limit')?.toString().trim() || '50',
+  }
+
+  await loadAdminVisitReviews(search)
+}
+
+async function handleAdminVisitReviewModerationForm(event) {
+  event.preventDefault()
+
+  const form = event.currentTarget
+  const id = form.dataset.adminVisitReviewForm
+  const formData = new FormData(form)
+  const moderationStatus = formData.get('moderationStatus')?.toString().trim() ?? ''
+
+  if (!id || !['visible', 'hidden'].includes(moderationStatus)) {
+    setAdminState((current) => ({
+      ...current,
+      error: '변경할 후기 상태를 확인해주세요.',
+    }))
+    return
+  }
+
+  setAdminState((current) => ({
+    ...current,
+    isLoading: true,
+    error: '',
+  }))
+
+  try {
+    await adminApiRequest(`/api/admin/visit-reviews/${encodeURIComponent(id)}/moderation`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        moderationStatus,
+        hiddenReason: formData.get('hiddenReason')?.toString().trim() || null,
+      }),
+    })
+    if (currentAdminSection() === 'reviews') {
+      await loadAdminVisitReviews()
+      return
+    }
+
+    await loadAdminDashboard()
+  } catch (error) {
+    setAdminState((current) => ({
+      ...current,
+      isLoading: false,
+      error: error.message || '방문 후기 상태를 변경하지 못했습니다.',
+    }))
+  }
+}
+
 function bindGlobalEvents() {
   app.querySelector('[data-admin-token-form]')?.addEventListener('submit', handleAdminTokenForm)
-  app.querySelector('[data-admin-refresh]')?.addEventListener('click', () => loadAdminDashboard())
+  app.querySelector('[data-admin-refresh]')?.addEventListener('click', () => loadAdminRouteData())
   app.querySelector('[data-admin-clear-token]')?.addEventListener('click', clearAdminToken)
   app
     .querySelector('[data-admin-member-search-form]')
@@ -4799,6 +5057,9 @@ function bindGlobalEvents() {
   app
     .querySelector('[data-admin-memorial-search-form]')
     ?.addEventListener('submit', handleAdminMemorialSearchForm)
+  app
+    .querySelector('[data-admin-visit-review-search-form]')
+    ?.addEventListener('submit', handleAdminVisitReviewSearchForm)
   app.querySelectorAll('[data-admin-partner-status-form]').forEach((form) => {
     form.addEventListener('submit', handleAdminPartnerStatusForm)
   })
@@ -4807,6 +5068,9 @@ function bindGlobalEvents() {
   })
   app.querySelectorAll('[data-admin-memorial-form]').forEach((form) => {
     form.addEventListener('submit', handleAdminMemorialForm)
+  })
+  app.querySelectorAll('[data-admin-visit-review-form]').forEach((form) => {
+    form.addEventListener('submit', handleAdminVisitReviewModerationForm)
   })
 
   app
@@ -7560,7 +7824,7 @@ function reloadCurrentRoute() {
 
   if (isAdminRoute()) {
     if (adminState.token) {
-      loadAdminDashboard()
+      loadAdminRouteData()
     }
     return
   }
@@ -7578,7 +7842,7 @@ window.addEventListener('hashchange', reloadCurrentRoute)
 render()
 if (isAdminRoute()) {
   if (adminState.token) {
-    loadAdminDashboard()
+    loadAdminRouteData()
   }
 } else if (!isCreateRoute()) {
   loadFromApi({
