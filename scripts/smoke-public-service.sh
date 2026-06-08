@@ -12,6 +12,8 @@ BASE_URL="${BASE_URL%/}"
 API_BASE_URL="${SILVER_API_BASE_URL:-$BASE_URL}"
 API_BASE_URL="${API_BASE_URL%/}"
 SMOKE_REGION="${SILVER_SMOKE_REGION:-강릉}"
+SMOKE_RETRIES="${SILVER_SMOKE_RETRIES:-6}"
+SMOKE_RETRY_SLEEP_SECONDS="${SILVER_SMOKE_RETRY_SLEEP_SECONDS:-2}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -29,18 +31,26 @@ curl_body() {
   local expected_status="$3"
   local output="$TMP_DIR/${name}.body"
   local status
+  local attempt
 
   : > "$output"
-  status="$(curl -sS -L -o "$output" -w "%{http_code}" "$url")"
+  for attempt in $(seq 1 "$SMOKE_RETRIES"); do
+    status="$(curl -sS -L -o "$output" -w "%{http_code}" "$url" || printf '000')"
 
-  if [ "$status" != "$expected_status" ]; then
-    echo "FAIL $name: expected HTTP $expected_status but got $status" >&2
-    echo "URL: $url" >&2
-    sed -n '1,80p' "$output" >&2
-    exit 1
-  fi
+    if [ "$status" = "$expected_status" ]; then
+      echo "$output"
+      return
+    fi
 
-  echo "$output"
+    if [ "$attempt" -lt "$SMOKE_RETRIES" ]; then
+      sleep "$SMOKE_RETRY_SLEEP_SECONDS"
+    fi
+  done
+
+  echo "FAIL $name: expected HTTP $expected_status but got $status" >&2
+  echo "URL: $url" >&2
+  sed -n '1,80p' "$output" >&2
+  exit 1
 }
 
 curl_admin_body() {
@@ -49,22 +59,30 @@ curl_admin_body() {
   local expected_status="$3"
   local output="$TMP_DIR/${name}.body"
   local status
+  local attempt
 
   : > "$output"
-  status="$(curl -sS -L \
-    -H "X-Silver-Admin-Token: ${SILVER_ADMIN_TOKEN:-}" \
-    -o "$output" \
-    -w "%{http_code}" \
-    "$url")"
+  for attempt in $(seq 1 "$SMOKE_RETRIES"); do
+    status="$(curl -sS -L \
+      -H "X-Silver-Admin-Token: ${SILVER_ADMIN_TOKEN:-}" \
+      -o "$output" \
+      -w "%{http_code}" \
+      "$url" || printf '000')"
 
-  if [ "$status" != "$expected_status" ]; then
-    echo "FAIL $name: expected HTTP $expected_status but got $status" >&2
-    echo "URL: $url" >&2
-    sed -n '1,80p' "$output" >&2
-    exit 1
-  fi
+    if [ "$status" = "$expected_status" ]; then
+      echo "$output"
+      return
+    fi
 
-  echo "$output"
+    if [ "$attempt" -lt "$SMOKE_RETRIES" ]; then
+      sleep "$SMOKE_RETRY_SLEEP_SECONDS"
+    fi
+  done
+
+  echo "FAIL $name: expected HTTP $expected_status but got $status" >&2
+  echo "URL: $url" >&2
+  sed -n '1,80p' "$output" >&2
+  exit 1
 }
 
 assert_contains() {
