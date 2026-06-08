@@ -2557,10 +2557,68 @@ textarea {
   gap: 18px;
 }
 
+.admin-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.admin-menu-card {
+  display: grid;
+  min-height: 108px;
+  gap: 8px;
+  align-content: start;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  padding: 14px;
+  text-decoration: none;
+  box-shadow: var(--shadow);
+}
+
+.admin-menu-card strong {
+  font-size: 1.02rem;
+}
+
+.admin-menu-card span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 850;
+  line-height: 1.4;
+}
+
+.admin-menu-card.is-active {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: var(--accent-contrast);
+}
+
+.admin-menu-card.is-active span {
+  color: color-mix(in srgb, var(--accent-contrast) 82%, transparent);
+}
+
 .admin-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+}
+
+.admin-search-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.3fr) repeat(3, minmax(140px, 0.7fr)) auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 16px;
+}
+
+.admin-search-form label {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  font-weight: 950;
 }
 
 .admin-stat-card {
@@ -2831,6 +2889,11 @@ textarea {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .admin-menu-grid,
+  .admin-search-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .business-hero {
     padding: 30px;
   }
@@ -2906,6 +2969,11 @@ textarea {
   }
 
   .admin-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-menu-grid,
+  .admin-search-form {
     grid-template-columns: 1fr;
   }
 

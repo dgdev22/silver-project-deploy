@@ -433,6 +433,14 @@ let adminState = {
   isLoading: false,
   error: '',
   dashboard: null,
+  memberSearch: {
+    query: '',
+    role: '',
+    status: '',
+    limit: '50',
+  },
+  memberResults: [],
+  memberSearchLoaded: false,
 }
 let state = {
   ...loadState(),
@@ -886,6 +894,22 @@ function memoryAdminUrl() {
   return `${memoryBaseUrl()}#/admin`
 }
 
+function memoryAdminMembersUrl() {
+  return `${memoryBaseUrl()}#/admin/members`
+}
+
+function memoryAdminPartnersUrl() {
+  return `${memoryBaseUrl()}#/admin/partners`
+}
+
+function memoryAdminMemorialsUrl() {
+  return `${memoryBaseUrl()}#/admin/memorials`
+}
+
+function memoryAdminDataUrl() {
+  return `${memoryBaseUrl()}#/admin/data`
+}
+
 function businessInquiryUrl() {
   const subject = encodeURIComponent('[Silver Memory] QR 추모관 제휴 문의')
   const body = encodeURIComponent(
@@ -1006,6 +1030,50 @@ async function loadAdminDashboard() {
   }
 }
 
+async function loadAdminMembers(search = adminState.memberSearch) {
+  if (!adminState.token.trim()) {
+    setAdminState((current) => ({
+      ...current,
+      memberResults: [],
+      memberSearchLoaded: false,
+      error: '관리자 토큰을 입력해주세요.',
+    }))
+    return
+  }
+
+  const params = new URLSearchParams()
+  if (search.query?.trim()) params.set('query', search.query.trim())
+  if (search.role?.trim()) params.set('role', search.role.trim())
+  if (search.status?.trim()) params.set('status', search.status.trim())
+  params.set('limit', String(Number(search.limit) || 50))
+
+  setAdminState((current) => ({
+    ...current,
+    memberSearch: search,
+    isLoading: true,
+    error: '',
+  }))
+
+  try {
+    const members = await adminApiRequest(`/api/admin/memory/family-members?${params.toString()}`)
+    setAdminState((current) => ({
+      ...current,
+      isLoading: false,
+      error: '',
+      memberResults: members,
+      memberSearchLoaded: true,
+    }))
+  } catch (error) {
+    setAdminState((current) => ({
+      ...current,
+      isLoading: false,
+      error: error.message || '회원 정보를 조회하지 못했습니다.',
+      memberResults: [],
+      memberSearchLoaded: false,
+    }))
+  }
+}
+
 function memoryBaseUrl() {
   const url = new URL(window.location.href)
 
@@ -1018,6 +1086,15 @@ function isBusinessRoute() {
 
 function isAdminRoute() {
   return window.location.hash.startsWith('#/admin')
+}
+
+function currentAdminSection() {
+  if (window.location.hash.startsWith('#/admin/members')) return 'members'
+  if (window.location.hash.startsWith('#/admin/partners')) return 'partners'
+  if (window.location.hash.startsWith('#/admin/memorials')) return 'memorials'
+  if (window.location.hash.startsWith('#/admin/data')) return 'data'
+
+  return 'overview'
 }
 
 function isPartnerCreateRoute() {
@@ -1205,15 +1282,18 @@ function render() {
   applyDesignTheme()
 
   if (isAdminRoute()) {
+    const adminSection = currentAdminSection()
     app.innerHTML = `
       <header class="app-header">
         <a class="brand" href="${escapeHtml(memoryAdminUrl())}" aria-label="Silver Memory 관리자 홈">
           <span>Silver Memory Admin</span>
         </a>
         <nav class="top-nav" aria-label="관리자 메뉴">
-          ${navLink(memoryAdminUrl(), '운영 현황', true)}
-          ${navLink(memoryBusinessUrl(), '사업자 제휴', false)}
-          ${navLink(memoryPartnerCreateUrl(), '5분 생성', false)}
+          ${navLink(memoryAdminUrl(), '운영 현황', adminSection === 'overview')}
+          ${navLink(memoryAdminMembersUrl(), '회원 조회', adminSection === 'members')}
+          ${navLink(memoryAdminPartnersUrl(), '제휴 문의', adminSection === 'partners')}
+          ${navLink(memoryAdminMemorialsUrl(), '추모관', adminSection === 'memorials')}
+          ${navLink(memoryAdminDataUrl(), '데이터 수집', adminSection === 'data')}
           ${navLink(memoryPageUrlForSlug(DEFAULT_MEMORY_SLUG), '샘플 추모관', false)}
         </nav>
         <div class="storage-status ${adminState.dashboard ? 'is-live' : 'is-local'}">
@@ -1336,6 +1416,7 @@ function render() {
 
 function renderAdminDashboard() {
   const dashboard = adminState.dashboard
+  const section = currentAdminSection()
 
   return `
     <section class="admin-hero">
@@ -1373,44 +1454,13 @@ function renderAdminDashboard() {
       </form>
     </section>
 
+    ${renderAdminSectionMenu(section)}
+
     ${adminState.error ? `<p class="status-note">${escapeHtml(adminState.error)}</p>` : ''}
 
     ${
       dashboard
-        ? `
-          <section class="admin-section">
-            <div class="section-title">
-              <span class="eyebrow">요약</span>
-              <h2>오늘의 운영 체크</h2>
-              <p>생성 시각 ${escapeHtml(formatDateTime(dashboard.generatedAt) || '-')}</p>
-            </div>
-            <div class="admin-stat-grid">
-              ${renderAdminMetric('생활정보', dashboard.summary.lifeInfoCount, `${formatAdminNumber(dashboard.summary.activeLifeInfoCount)}건 활성`)}
-              ${renderAdminMetric('좌표 누락', dashboard.summary.missingCoordinateCount, '지도 노출 전 확인')}
-              ${renderAdminMetric('수집 실패', dashboard.summary.collectorFailureCount, '원천 API/키 점검')}
-              ${renderAdminMetric('추모관', dashboard.summary.memorialCount, '생성된 전체 추모관')}
-              ${renderAdminMetric('신규 제휴문의', dashboard.summary.newPartnerInquiryCount, '영업 팔로업 필요')}
-              ${renderAdminMetric('방명록 대기', dashboard.summary.pendingGuestbookCount, '유족 승인 필요')}
-              ${renderAdminMetric('가족 권한', dashboard.summary.activeFamilyMemberCount, '활성 회원 권한')}
-              ${renderAdminMetric('헌화/환불', dashboard.summary.tributeRefundQueueCount, `${formatAdminNumber(dashboard.summary.tributeDraftCount)}건 결제 초안`)}
-            </div>
-          </section>
-
-          <div class="admin-grid">
-            ${renderAdminLifeInfoSection(dashboard.lifeInfoTypes)}
-            ${renderAdminRegionSection(dashboard.regions)}
-          </div>
-
-          <div class="admin-grid">
-            ${renderAdminCollectorSection(dashboard.collectorRuns)}
-            ${renderAdminPartnerSection(dashboard.partnerInquiries)}
-          </div>
-
-          <div class="admin-grid">
-            ${renderAdminMemorialSection(dashboard.memorials)}
-            ${renderAdminFamilySection(dashboard.familyMembers)}
-          </div>
-        `
+        ? renderAdminSectionContent(section, dashboard)
         : `
           <section class="admin-empty panel">
             <h2>토큰을 입력하면 운영 데이터가 열립니다.</h2>
@@ -1421,6 +1471,81 @@ function renderAdminDashboard() {
           </section>
         `
     }
+  `
+}
+
+function renderAdminSectionMenu(current) {
+  const items = [
+    ['overview', memoryAdminUrl(), '운영 현황', '전체 상태를 빠르게 점검'],
+    ['members', memoryAdminMembersUrl(), '회원·권한', '가족 계정 검색과 권한 관리'],
+    ['partners', memoryAdminPartnersUrl(), '제휴 문의', '영업 상태와 다음 연락 관리'],
+    ['memorials', memoryAdminMemorialsUrl(), '추모관', '생성된 전시관과 공개 상태 확인'],
+    ['data', memoryAdminDataUrl(), '데이터 수집', '공공데이터 품질과 수집기 확인'],
+  ]
+
+  return `
+    <nav class="admin-menu-grid" aria-label="백오피스 세부 메뉴">
+      ${items.map(([id, href, title, body]) => `
+        <a class="admin-menu-card ${current === id ? 'is-active' : ''}" href="${escapeHtml(href)}">
+          <strong>${escapeHtml(title)}</strong>
+          <span>${escapeHtml(body)}</span>
+        </a>
+      `).join('')}
+    </nav>
+  `
+}
+
+function renderAdminSectionContent(section, dashboard) {
+  if (section === 'members') {
+    return renderAdminMemberLookup(dashboard.familyMembers)
+  }
+
+  if (section === 'partners') {
+    return renderAdminPartnerSection(dashboard.partnerInquiries)
+  }
+
+  if (section === 'memorials') {
+    return renderAdminMemorialSection(dashboard.memorials)
+  }
+
+  if (section === 'data') {
+    return `
+      <div class="admin-grid">
+        ${renderAdminLifeInfoSection(dashboard.lifeInfoTypes)}
+        ${renderAdminRegionSection(dashboard.regions)}
+      </div>
+      ${renderAdminCollectorSection(dashboard.collectorRuns)}
+    `
+  }
+
+  return `
+    <section class="admin-section">
+      <div class="section-title">
+        <span class="eyebrow">요약</span>
+        <h2>오늘의 운영 체크</h2>
+        <p>생성 시각 ${escapeHtml(formatDateTime(dashboard.generatedAt) || '-')}</p>
+      </div>
+      <div class="admin-stat-grid">
+        ${renderAdminMetric('생활정보', dashboard.summary.lifeInfoCount, `${formatAdminNumber(dashboard.summary.activeLifeInfoCount)}건 활성`)}
+        ${renderAdminMetric('좌표 누락', dashboard.summary.missingCoordinateCount, '지도 노출 전 확인')}
+        ${renderAdminMetric('수집 실패', dashboard.summary.collectorFailureCount, '원천 API/키 점검')}
+        ${renderAdminMetric('추모관', dashboard.summary.memorialCount, '생성된 전체 추모관')}
+        ${renderAdminMetric('신규 제휴문의', dashboard.summary.newPartnerInquiryCount, '영업 팔로업 필요')}
+        ${renderAdminMetric('방명록 대기', dashboard.summary.pendingGuestbookCount, '유족 승인 필요')}
+        ${renderAdminMetric('가족 권한', dashboard.summary.activeFamilyMemberCount, '활성 회원 권한')}
+        ${renderAdminMetric('헌화/환불', dashboard.summary.tributeRefundQueueCount, `${formatAdminNumber(dashboard.summary.tributeDraftCount)}건 결제 초안`)}
+      </div>
+    </section>
+
+    <div class="admin-grid">
+      ${renderAdminPartnerSection(dashboard.partnerInquiries)}
+      ${renderAdminFamilySection(dashboard.familyMembers)}
+    </div>
+
+    <div class="admin-grid">
+      ${renderAdminMemorialSection(dashboard.memorials)}
+      ${renderAdminCollectorSection(dashboard.collectorRuns)}
+    </div>
   `
 }
 
@@ -1597,12 +1722,68 @@ function renderAdminMemorialSection(items = []) {
   `
 }
 
-function renderAdminFamilySection(items = []) {
+function renderAdminMemberLookup(recentItems = []) {
+  const search = adminState.memberSearch
+  const items = adminState.memberSearchLoaded ? adminState.memberResults : recentItems
+  const title = adminState.memberSearchLoaded ? '회원 검색 결과' : '최근 가족 권한'
+
+  return `
+    <section class="admin-section">
+      <div class="section-title">
+        <span class="eyebrow">회원정보 조회</span>
+        <h2>가족 계정과 편집 권한 검색</h2>
+        <p>이름, 이메일, Google userId, 추모관 이름 또는 slug로 검색할 수 있습니다.</p>
+      </div>
+      <form class="admin-search-form" data-admin-member-search-form>
+        <label>
+          검색어
+          <input name="query" value="${escapeHtml(search.query)}" placeholder="이름, 이메일, userId, 추모관명" />
+        </label>
+        <label>
+          역할
+          <select name="role">
+            <option value="">전체 역할</option>
+            ${ADMIN_FAMILY_ROLES.map((role) => `
+              <option value="${escapeHtml(role)}" ${role === search.role ? 'selected' : ''}>
+                ${escapeHtml(adminStatusLabel(role))}
+              </option>
+            `).join('')}
+          </select>
+        </label>
+        <label>
+          상태
+          <select name="status">
+            <option value="">전체 상태</option>
+            ${ADMIN_FAMILY_STATUSES.map((status) => `
+              <option value="${escapeHtml(status)}" ${status === search.status ? 'selected' : ''}>
+                ${escapeHtml(adminStatusLabel(status))}
+              </option>
+            `).join('')}
+          </select>
+        </label>
+        <label>
+          표시 개수
+          <select name="limit">
+            ${['20', '50', '100', '200'].map((limit) => `
+              <option value="${limit}" ${limit === search.limit ? 'selected' : ''}>${limit}개</option>
+            `).join('')}
+          </select>
+        </label>
+        <button type="submit" class="primary-button" ${adminState.isLoading ? 'disabled' : ''}>
+          ${adminState.isLoading ? '조회 중' : '회원 조회'}
+        </button>
+      </form>
+    </section>
+    ${renderAdminFamilySection(items, title)}
+  `
+}
+
+function renderAdminFamilySection(items = [], title = '최근 가족 권한') {
   return `
     <section class="admin-section">
       <div class="section-title">
         <span class="eyebrow">회원/권한</span>
-        <h2>최근 가족 권한</h2>
+        <h2>${escapeHtml(title)}</h2>
       </div>
       ${renderAdminTable(
         ['추모관', '사용자', '역할', '상태', '관리', '등록'],
@@ -4364,6 +4545,11 @@ async function handleAdminFamilyMemberForm(event) {
       method: 'PATCH',
       body: JSON.stringify({ role, status }),
     })
+    if (currentAdminSection() === 'members' && adminState.memberSearchLoaded) {
+      await loadAdminMembers()
+      return
+    }
+
     await loadAdminDashboard()
   } catch (error) {
     setAdminState((current) => ({
@@ -4374,10 +4560,27 @@ async function handleAdminFamilyMemberForm(event) {
   }
 }
 
+async function handleAdminMemberSearchForm(event) {
+  event.preventDefault()
+
+  const formData = new FormData(event.currentTarget)
+  const search = {
+    query: formData.get('query')?.toString().trim() ?? '',
+    role: formData.get('role')?.toString().trim() ?? '',
+    status: formData.get('status')?.toString().trim() ?? '',
+    limit: formData.get('limit')?.toString().trim() || '50',
+  }
+
+  await loadAdminMembers(search)
+}
+
 function bindGlobalEvents() {
   app.querySelector('[data-admin-token-form]')?.addEventListener('submit', handleAdminTokenForm)
   app.querySelector('[data-admin-refresh]')?.addEventListener('click', () => loadAdminDashboard())
   app.querySelector('[data-admin-clear-token]')?.addEventListener('click', clearAdminToken)
+  app
+    .querySelector('[data-admin-member-search-form]')
+    ?.addEventListener('submit', handleAdminMemberSearchForm)
   app.querySelectorAll('[data-admin-partner-status-form]').forEach((form) => {
     form.addEventListener('submit', handleAdminPartnerStatusForm)
   })
