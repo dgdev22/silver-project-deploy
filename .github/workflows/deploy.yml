@@ -5,6 +5,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      run_smoke:
+        description: Run read-only public service and Memory smoke tests after deploy
+        required: false
+        type: boolean
+        default: true
 
 concurrency:
   group: silver-lightsail-deploy
@@ -47,7 +53,15 @@ jobs:
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
       - name: Deploy on Lightsail
+        env:
+          RUN_SMOKE: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_smoke) || (github.event_name != 'workflow_dispatch' && vars.LIGHTSAIL_DEPLOY_SMOKE == 'true') }}
         run: |
+          set -euo pipefail
+          smoke_flag=0
+          if [ "$RUN_SMOKE" = "true" ]; then
+            smoke_flag=1
+          fi
+
           ssh -i ~/.ssh/lightsail_key \
             "$SSH_TARGET" \
-            'flock -w 900 /tmp/silver-lightsail-deploy.lock bash -lc "cd ~/apps/silverProject/deploy && git pull --ff-only && chmod +x scripts/*.sh && ./scripts/deploy-app.sh"'
+            "flock -w 900 /tmp/silver-lightsail-deploy.lock bash -lc 'cd ~/apps/silverProject/deploy && git pull --ff-only && chmod +x scripts/*.sh && SILVER_DEPLOY_SMOKE=${smoke_flag} ./scripts/deploy-app.sh'"
