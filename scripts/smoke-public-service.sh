@@ -15,6 +15,7 @@ SMOKE_REGION="${SILVER_SMOKE_REGION:-강릉}"
 SMOKE_RETRIES="${SILVER_SMOKE_RETRIES:-6}"
 SMOKE_RETRY_SLEEP_SECONDS="${SILVER_SMOKE_RETRY_SLEEP_SECONDS:-2}"
 SMOKE_MIN_TOTAL_COUNT="${SILVER_SMOKE_MIN_TOTAL_COUNT:-1}"
+SMOKE_MIN_LAYER_COUNT="${SILVER_SMOKE_MIN_LAYER_COUNT:-1}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -180,6 +181,119 @@ print(f"PASS {label}: totalCount {total_count} >= {min_count}")
 PY
 }
 
+assert_map_contract() {
+  local label="$1"
+  local file="$2"
+  local min_layer_count="$3"
+
+  python3 - "$label" "$file" "$min_layer_count" <<'PY'
+import json
+import sys
+
+label = sys.argv[1]
+path = sys.argv[2]
+min_layer_count = int(sys.argv[3])
+
+with open(path, encoding="utf-8") as handle:
+    data = json.load(handle)
+
+if not isinstance(data, dict):
+    print(f"FAIL {label}: expected object response", file=sys.stderr)
+    sys.exit(1)
+
+layers = data.get("layers")
+if not isinstance(layers, list):
+    print(f"FAIL {label}: layers should be a list", file=sys.stderr)
+    sys.exit(1)
+
+if len(layers) < min_layer_count:
+    print(
+        f"FAIL {label}: layer count {len(layers)} is below minimum {min_layer_count}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+for index, layer in enumerate(layers):
+    if not isinstance(layer, dict):
+        print(f"FAIL {label}: layer #{index + 1} should be an object", file=sys.stderr)
+        sys.exit(1)
+    layer_items = None
+    for item_key in ("services", "items", "places"):
+        if item_key in layer:
+            layer_items = layer.get(item_key)
+            break
+    if not isinstance(layer_items, list):
+        print(
+            f"FAIL {label}: layer #{index + 1} should include a services/items list",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    layer_count = layer.get("count")
+    if layer_count is not None and (
+        not isinstance(layer_count, int) or layer_count < 0
+    ):
+        print(
+            f"FAIL {label}: layer #{index + 1} count should be a non-negative integer",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+mappable_count = data.get("mappableCount")
+if not isinstance(mappable_count, int) or mappable_count < 0:
+    print(f"FAIL {label}: mappableCount should be a non-negative integer", file=sys.stderr)
+    sys.exit(1)
+
+score = data.get("score")
+if not isinstance(score, dict):
+    print(f"FAIL {label}: score should be an object", file=sys.stderr)
+    sys.exit(1)
+
+score_value = None
+score_key = None
+preferred_score_keys = (
+    "totalScore",
+    "laterLifePlaceScore",
+    "seniorTourScore",
+    "mobilityAccessScore",
+    "healthSafetyScore",
+    "educationExperienceScore",
+)
+for candidate_key in preferred_score_keys:
+    candidate_value = score.get(candidate_key)
+    if isinstance(candidate_value, (int, float)):
+        score_key = candidate_key
+        score_value = candidate_value
+        break
+
+if score_value is None:
+    for candidate_key, candidate_value in score.items():
+        if (
+            candidate_key != "confidenceScore"
+            and candidate_key.endswith("Score")
+            and isinstance(candidate_value, (int, float))
+        ):
+            score_key = candidate_key
+            score_value = candidate_value
+            break
+
+if not isinstance(score_value, (int, float)) or not 0 <= score_value <= 100:
+    print(
+        f"FAIL {label}: score should include a 0-100 main score field",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+grade = score.get("grade")
+if grade is not None and not isinstance(grade, str):
+    print(f"FAIL {label}: score.grade should be a string when present", file=sys.stderr)
+    sys.exit(1)
+
+print(
+    f"PASS {label}: layers {len(layers)}, mappableCount {mappable_count}, {score_key} {round(score_value)}"
+)
+PY
+}
+
 extract_backend_id() {
   local file="$1"
 
@@ -229,6 +343,7 @@ echo "Frontend: $BASE_URL"
 echo "API base: $API_BASE_URL"
 echo "Region:   $SMOKE_REGION"
 echo "Min total: $SMOKE_MIN_TOTAL_COUNT"
+echo "Min layers: $SMOKE_MIN_LAYER_COUNT"
 
 for path in "/" "/learning" "/tour" "/mobility" "/health" "/contest/food" "/contest/mobility"; do
   page_name="$(echo "$path" | tr '/-' '__')"
@@ -241,21 +356,25 @@ education_body="$(curl_body education_map "${API_BASE_URL}/api/education-experie
 assert_json "$education_body" "education map API should return JSON"
 print_json_summary "education map API" "$education_body"
 assert_total_count_at_least "education map API" "$education_body" "$SMOKE_MIN_TOTAL_COUNT"
+assert_map_contract "education map API" "$education_body" "$SMOKE_MIN_LAYER_COUNT"
 
 tour_body="$(curl_body senior_tour_map "${API_BASE_URL}/api/senior-tour-map?region=${ENCODED_REGION}&perCategoryLimit=1" 200)"
 assert_json "$tour_body" "tour map API should return JSON"
 print_json_summary "tour map API" "$tour_body"
 assert_total_count_at_least "tour map API" "$tour_body" "$SMOKE_MIN_TOTAL_COUNT"
+assert_map_contract "tour map API" "$tour_body" "$SMOKE_MIN_LAYER_COUNT"
 
 mobility_body="$(curl_body mobility_map "${API_BASE_URL}/api/mobility-access-map?region=${ENCODED_REGION}&perCategoryLimit=1" 200)"
 assert_json "$mobility_body" "mobility map API should return JSON"
 print_json_summary "mobility map API" "$mobility_body"
 assert_total_count_at_least "mobility map API" "$mobility_body" "$SMOKE_MIN_TOTAL_COUNT"
+assert_map_contract "mobility map API" "$mobility_body" "$SMOKE_MIN_LAYER_COUNT"
 
 health_body="$(curl_body health_map "${API_BASE_URL}/api/health-safety-map?region=${ENCODED_REGION}&perCategoryLimit=1" 200)"
 assert_json "$health_body" "health map API should return JSON"
 print_json_summary "health map API" "$health_body"
 assert_total_count_at_least "health map API" "$health_body" "$SMOKE_MIN_TOTAL_COUNT"
+assert_map_contract "health map API" "$health_body" "$SMOKE_MIN_LAYER_COUNT"
 
 admin_denied="$(curl_body admin_dashboard_denied "${API_BASE_URL}/api/admin/dashboard" 403)"
 assert_contains "$admin_denied" "Invalid admin token\\|Forbidden\\|403" "Admin dashboard should reject missing token"
