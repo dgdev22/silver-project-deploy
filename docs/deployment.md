@@ -218,6 +218,13 @@ SILVER_ADMIN_TOKEN="$(awk -F= '/^SILVER_ADMIN_TOKEN=/{print $2}' .env.prod)" \
   ./deploy/scripts/smoke-public-service.sh https://silver.loopmateapp.com
 ```
 
+배포 후 public service와 Memory 읽기 전용 점검을 한 번에 돌릴 때는:
+
+```bash
+cd ~/apps/silverProject/deploy
+./scripts/smoke-after-deploy.sh
+```
+
 ## Silver Memory Smoke Test
 
 배포 후에는 Memory 프론트, 공개 API 응답 계약, 공지사항 필드, API 보호 상태를 한 번에 확인한다.

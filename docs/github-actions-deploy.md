@@ -109,6 +109,13 @@ chmod +x scripts/*.sh
 ./scripts/deploy-app.sh
 ```
 
+배포 직후 public service와 Memory 읽기 전용 smoke test까지 확인하려면:
+
+```bash
+cd ~/apps/silverProject/deploy
+SILVER_DEPLOY_SMOKE=1 ./scripts/deploy-app.sh
+```
+
 데이터 갱신:
 
 ```bash

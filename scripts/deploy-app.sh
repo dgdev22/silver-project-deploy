@@ -49,4 +49,8 @@ docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" restart caddy
 
 docker image prune -f
 
+if [ "${SILVER_DEPLOY_SMOKE:-0}" = "1" ]; then
+  deploy/scripts/smoke-after-deploy.sh
+fi
+
 echo "Deployment complete."
