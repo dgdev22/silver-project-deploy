@@ -14,6 +14,7 @@ API_BASE_URL="${API_BASE_URL%/}"
 SMOKE_REGION="${SILVER_SMOKE_REGION:-강릉}"
 SMOKE_RETRIES="${SILVER_SMOKE_RETRIES:-6}"
 SMOKE_RETRY_SLEEP_SECONDS="${SILVER_SMOKE_RETRY_SLEEP_SECONDS:-2}"
+SMOKE_MIN_TOTAL_COUNT="${SILVER_SMOKE_MIN_TOTAL_COUNT:-1}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -143,6 +144,42 @@ else:
 PY
 }
 
+assert_total_count_at_least() {
+  local label="$1"
+  local file="$2"
+  local min_count="$3"
+
+  python3 - "$label" "$file" "$min_count" <<'PY'
+import json
+import sys
+
+label = sys.argv[1]
+path = sys.argv[2]
+min_count = int(sys.argv[3])
+
+with open(path, encoding="utf-8") as handle:
+    data = json.load(handle)
+
+if not isinstance(data, dict):
+    print(f"FAIL {label}: expected object response with totalCount", file=sys.stderr)
+    sys.exit(1)
+
+total_count = data.get("totalCount")
+if not isinstance(total_count, int):
+    print(f"FAIL {label}: totalCount should be an integer, got {total_count!r}", file=sys.stderr)
+    sys.exit(1)
+
+if total_count < min_count:
+    print(
+        f"FAIL {label}: totalCount {total_count} is below minimum {min_count}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+print(f"PASS {label}: totalCount {total_count} >= {min_count}")
+PY
+}
+
 extract_backend_id() {
   local file="$1"
 
@@ -191,6 +228,7 @@ echo "Silver Smile public service smoke test"
 echo "Frontend: $BASE_URL"
 echo "API base: $API_BASE_URL"
 echo "Region:   $SMOKE_REGION"
+echo "Min total: $SMOKE_MIN_TOTAL_COUNT"
 
 for path in "/" "/learning" "/tour" "/mobility" "/health" "/contest/food" "/contest/mobility"; do
   page_name="$(echo "$path" | tr '/-' '__')"
@@ -202,18 +240,22 @@ done
 education_body="$(curl_body education_map "${API_BASE_URL}/api/education-experience-map?region=${ENCODED_REGION}&perCategoryLimit=1" 200)"
 assert_json "$education_body" "education map API should return JSON"
 print_json_summary "education map API" "$education_body"
+assert_total_count_at_least "education map API" "$education_body" "$SMOKE_MIN_TOTAL_COUNT"
 
 tour_body="$(curl_body senior_tour_map "${API_BASE_URL}/api/senior-tour-map?region=${ENCODED_REGION}&perCategoryLimit=1" 200)"
 assert_json "$tour_body" "tour map API should return JSON"
 print_json_summary "tour map API" "$tour_body"
+assert_total_count_at_least "tour map API" "$tour_body" "$SMOKE_MIN_TOTAL_COUNT"
 
 mobility_body="$(curl_body mobility_map "${API_BASE_URL}/api/mobility-access-map?region=${ENCODED_REGION}&perCategoryLimit=1" 200)"
 assert_json "$mobility_body" "mobility map API should return JSON"
 print_json_summary "mobility map API" "$mobility_body"
+assert_total_count_at_least "mobility map API" "$mobility_body" "$SMOKE_MIN_TOTAL_COUNT"
 
 health_body="$(curl_body health_map "${API_BASE_URL}/api/health-safety-map?region=${ENCODED_REGION}&perCategoryLimit=1" 200)"
 assert_json "$health_body" "health map API should return JSON"
 print_json_summary "health map API" "$health_body"
+assert_total_count_at_least "health map API" "$health_body" "$SMOKE_MIN_TOTAL_COUNT"
 
 admin_denied="$(curl_body admin_dashboard_denied "${API_BASE_URL}/api/admin/dashboard" 403)"
 assert_contains "$admin_denied" "Invalid admin token\\|Forbidden\\|403" "Admin dashboard should reject missing token"
