@@ -1659,6 +1659,8 @@ function renderAdminSectionContent(section, dashboard) {
         ${renderAdminMetric('좌표 누락', dashboard.summary.missingCoordinateCount, '지도 노출 전 확인')}
         ${renderAdminMetric('수집 실패', dashboard.summary.collectorFailureCount, '원천 API/키 점검')}
         ${renderAdminMetric('추모관', dashboard.summary.memorialCount, '생성된 전체 추모관')}
+        ${renderAdminMetric('방문 후기', dashboard.summary.visitReviewCount ?? 0, `${formatAdminNumber(dashboard.summary.recentVisitReviewCount ?? 0)}건 최근 7일`)}
+        ${renderAdminMetric('숨김 후기', dashboard.summary.hiddenVisitReviewCount ?? 0, `${formatAdminNumber(dashboard.summary.deletedVisitReviewCount ?? 0)}건 작성자 삭제`)}
         ${renderAdminMetric('신규 제휴문의', dashboard.summary.newPartnerInquiryCount, '영업 팔로업 필요')}
         ${renderAdminMetric('방명록 대기', dashboard.summary.pendingGuestbookCount, '유족 승인 필요')}
         ${renderAdminMetric('가족 권한', dashboard.summary.activeFamilyMemberCount, '활성 회원 권한')}
