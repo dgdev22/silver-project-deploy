@@ -1982,48 +1982,56 @@ function renderAdminVisitReviewLookup() {
 }
 
 function renderAdminVisitReviewSection(items = [], title = '방문 후기') {
+  const emptyMessage = adminState.visitReviewSearchLoaded
+    ? '조건에 맞는 방문 후기가 없습니다. 관광 화면에서 새 후기가 등록되면 이곳에서 공개 여부를 관리할 수 있습니다.'
+    : '후기 조회를 누르면 최신 방문 후기와 공공데이터 예상점수 차이를 함께 확인할 수 있습니다.'
+
   return `
     <section class="admin-section">
       <div class="section-title">
         <span class="eyebrow">Tour Review</span>
         <h2>${escapeHtml(title)}</h2>
       </div>
-      ${renderAdminTable(
-        ['장소', '후기', '체감', '상태', '관리', '작성'],
-        items,
-        (item) => {
-          const review = item.review ?? {}
+      ${
+        items.length
+          ? renderAdminTable(
+              ['장소', '후기', '체감', '상태', '관리', '작성'],
+              items,
+              (item) => {
+                const review = item.review ?? {}
 
-          return `
-            <tr>
-              <td>
-                ${escapeHtml(item.lifeInfoTitle || '-')}
-                <small>${escapeHtml([item.region, item.category].filter(Boolean).join(' · ') || item.sourceName || '-')}</small>
-                ${item.address ? `<small>${escapeHtml(item.address)}</small>` : ''}
-                <small>공공데이터 예상 ${formatAdminNumber(item.recommendationScore)}점</small>
-              </td>
-              <td>
-                ${escapeHtml(review.reviewerName || '방문자')}
-                <small>${escapeHtml(review.memo || '한 줄 후기 없음')}</small>
-              </td>
-              <td>
-                ${formatAdminNumber(Number(review.overallRating || 0))}/5
-                <small>${escapeHtml(review.walkingBurdenLabel || '-')}</small>
-                <small>${escapeHtml(review.seniorFriendlyLabel || '-')}</small>
-              </td>
-              <td>
-                ${renderAdminStatusPill(review.moderationStatus || 'visible')}
-                ${review.hiddenReason ? `<small>${escapeHtml(review.hiddenReason)}</small>` : ''}
-              </td>
-              <td>${renderAdminVisitReviewModerationForm(review)}</td>
-              <td>
-                ${escapeHtml(formatDateTime(review.createdAt) || '-')}
-                ${review.visitMonth ? `<small>방문 ${escapeHtml(review.visitMonth)}</small>` : ''}
-              </td>
-            </tr>
-          `
-        },
-      )}
+                return `
+                  <tr>
+                    <td>
+                      ${escapeHtml(item.lifeInfoTitle || '-')}
+                      <small>${escapeHtml([item.region, item.category].filter(Boolean).join(' · ') || item.sourceName || '-')}</small>
+                      ${item.address ? `<small>${escapeHtml(item.address)}</small>` : ''}
+                      <small>공공데이터 예상 ${formatAdminNumber(item.recommendationScore)}점</small>
+                    </td>
+                    <td>
+                      ${escapeHtml(review.reviewerName || '방문자')}
+                      <small>${escapeHtml(review.memo || '한 줄 후기 없음')}</small>
+                    </td>
+                    <td>
+                      ${formatAdminNumber(Number(review.overallRating || 0))}/5
+                      <small>${escapeHtml(review.walkingBurdenLabel || '-')}</small>
+                      <small>${escapeHtml(review.seniorFriendlyLabel || '-')}</small>
+                    </td>
+                    <td>
+                      ${renderAdminStatusPill(review.moderationStatus || 'visible')}
+                      ${review.hiddenReason ? `<small>${escapeHtml(review.hiddenReason)}</small>` : ''}
+                    </td>
+                    <td>${renderAdminVisitReviewModerationForm(review)}</td>
+                    <td>
+                      ${escapeHtml(formatDateTime(review.createdAt) || '-')}
+                      ${review.visitMonth ? `<small>방문 ${escapeHtml(review.visitMonth)}</small>` : ''}
+                    </td>
+                  </tr>
+                `
+              },
+            )
+          : `<p class="empty-text">${escapeHtml(emptyMessage)}</p>`
+      }
     </section>
   `
 }
