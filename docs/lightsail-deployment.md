@@ -376,6 +376,7 @@ docker system df
 - [ ] 도메인 HTTPS 접속 가능
 - [ ] `/learning`, `/tour`, `/mobility`, `/health` 모두 정상
 - [ ] backend API 정상
+- [ ] `./scripts/smoke-public-service.sh https://silver.loopmateapp.com` 통과
 - [ ] 초기 데이터 import 완료
 - [ ] 공공데이터 원천/한계 문서 준비
 - [ ] 제출용 스크린샷 캡처

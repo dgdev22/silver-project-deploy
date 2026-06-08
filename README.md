@@ -28,6 +28,19 @@ Silver Memory 운영 백오피스는 `/memory/#/admin`에서 열고, `.env.prod`
 
 ## Smoke Tests
 
+Silver Smile 공공데이터 서비스 읽기 전용 점검. 주요 페이지, 지도 API, 관리자 보호 상태, 관광 후기 읽기 API를 확인합니다.
+
+```bash
+./scripts/smoke-public-service.sh https://silver.loopmateapp.com
+```
+
+운영 서버에서 `.env.prod`의 `SILVER_ADMIN_TOKEN`을 환경변수로 함께 넘기면 보호된 관리자 요약 필드까지 확인합니다.
+
+```bash
+SILVER_ADMIN_TOKEN='관리자_토큰' \
+./scripts/smoke-public-service.sh https://silver.loopmateapp.com
+```
+
 Silver Memory 배포 후 읽기 전용 점검. 프론트 HTML, 공개 API, `announcements` 응답 계약, 유족 보호 상태를 확인합니다.
 
 ```bash

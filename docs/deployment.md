@@ -201,6 +201,23 @@ curl "http://localhost:8080/api/health-safety-map?region=강릉&perCategoryLimit
 
 운영에서는 이 흐름을 scheduled collector job으로 바꾼다.
 
+## Silver Smile Public Service Smoke Test
+
+공공데이터 서비스의 주요 페이지, 지도 API, 관리자 보호 상태, 관광 후기 읽기 API를 읽기 전용으로 확인한다.
+
+```bash
+cd ~/apps/silverProject/deploy
+./scripts/smoke-public-service.sh https://silver.loopmateapp.com
+```
+
+관리자 요약 필드까지 확인하려면 서버의 `.env.prod`에서 토큰을 읽어 환경변수로 넘긴다. 토큰 값은 출력하지 않는다.
+
+```bash
+cd ~/apps/silverProject
+SILVER_ADMIN_TOKEN="$(awk -F= '/^SILVER_ADMIN_TOKEN=/{print $2}' .env.prod)" \
+  ./deploy/scripts/smoke-public-service.sh https://silver.loopmateapp.com
+```
+
 ## Silver Memory Smoke Test
 
 배포 후에는 Memory 프론트, 공개 API 응답 계약, 공지사항 필드, API 보호 상태를 한 번에 확인한다.
