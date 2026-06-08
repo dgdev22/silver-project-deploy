@@ -29,6 +29,7 @@
 - AI 태그 초안: 생애 글, 공지사항, 방명록을 바탕으로 키워드 후보를 만들고 유족이 승인
 - 운영 백오피스: `#/admin` 메뉴에서 운영 현황, 회원·권한 조회, 제휴 문의, 추모관, 데이터 수집 화면 분리
 - 회원정보 조회: 이름, 이메일, Google userId, 추모관 이름/slug로 가족 권한 검색, 역할/상태 필터, 가족 권한 역할/상태 변경
+- 추모관 관리: 이름, slug, 지역, 유족 계정으로 추모관 검색, 공개 범위 필터, 공개 범위 변경
 
 백엔드가 켜져 있으면 `/api/memory`를 통해 PostgreSQL에 저장합니다. 백엔드 연결이 없으면 브라우저 `localStorage`에 임시 저장되는 프론트엔드 MVP로 동작합니다.
 
@@ -88,9 +89,11 @@ DELETE /api/memory/guestbook/{id}/owner
 PATCH /api/memory/guestbook/{id}
 GET /api/admin/dashboard
 GET /api/admin/memory/family-members
+GET /api/admin/memory/memorials
 PATCH /api/admin/memory/partner-inquiries/{id}
 PATCH /api/admin/memory/partner-inquiries/{id}/status
 PATCH /api/admin/memory/family-members/{id}
+PATCH /api/admin/memory/memorials/{id}
 ```
 
 유족 편집 탭에서 샘플 코드는 `demo-family-token`입니다. 보호되는 API에는 다음 헤더가 붙습니다.
@@ -127,7 +130,7 @@ SILVER_ADMIN_TOKEN=긴_관리자_토큰
 
 `MEMORY_CREATION_RATE_LIMIT_MAX=0` 또는 `MEMORY_GUESTBOOK_RATE_LIMIT_MAX=0`으로 두면 해당 제한을 임시로 끌 수 있습니다.
 
-운영 백오피스는 `http://127.0.0.1:5175/#/admin` 또는 운영 경로 `/memory/#/admin`에서 열 수 있습니다. 로컬 기본 관리자 토큰은 `local-admin`이고, 운영에서는 반드시 `SILVER_ADMIN_TOKEN`을 별도로 설정합니다. 세부 메뉴는 `#/admin/members`, `#/admin/partners`, `#/admin/memorials`, `#/admin/data`입니다. 백오피스는 공공데이터 타입별 품질, 최근 수집 실행, 최근 추모관, 가족 권한, 제휴 문의를 확인하고 제휴 문의 상태를 `신규`, `연락 완료`, `검토 중`, `보관`으로 변경합니다. 각 제휴 문의에는 운영 담당자, 다음 연락일, 운영 메모를 저장할 수 있어 장례식장/추모시설 파트너 영업 이력을 이어받기 쉽습니다. 가족 권한은 이름, 이메일, Google userId, 추모관 이름 또는 slug로 검색할 수 있고, `소유자`, `편집자`, `열람자` 역할과 `활성`, `회수` 상태를 바꿀 수 있으며, 마지막 활성 소유자를 제거하지 못하도록 서버에서 막습니다.
+운영 백오피스는 `http://127.0.0.1:5175/#/admin` 또는 운영 경로 `/memory/#/admin`에서 열 수 있습니다. 로컬 기본 관리자 토큰은 `local-admin`이고, 운영에서는 반드시 `SILVER_ADMIN_TOKEN`을 별도로 설정합니다. 세부 메뉴는 `#/admin/members`, `#/admin/partners`, `#/admin/memorials`, `#/admin/data`입니다. 백오피스는 공공데이터 타입별 품질, 최근 수집 실행, 최근 추모관, 가족 권한, 제휴 문의를 확인하고 제휴 문의 상태를 `신규`, `연락 완료`, `검토 중`, `보관`으로 변경합니다. 각 제휴 문의에는 운영 담당자, 다음 연락일, 운영 메모를 저장할 수 있어 장례식장/추모시설 파트너 영업 이력을 이어받기 쉽습니다. 가족 권한은 이름, 이메일, Google userId, 추모관 이름 또는 slug로 검색할 수 있고, `소유자`, `편집자`, `열람자` 역할과 `활성`, `회수` 상태를 바꿀 수 있으며, 마지막 활성 소유자를 제거하지 못하도록 서버에서 막습니다. 추모관은 이름, slug, 지역, 유족 계정으로 검색할 수 있고 `가족만`, `링크 공개`, `전체 공개` 범위를 운영자가 조정할 수 있습니다.
 
 ## 디자인 변경
 

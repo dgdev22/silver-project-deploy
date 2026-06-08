@@ -248,6 +248,7 @@ const ADMIN_STATUS_LABELS = {
 const ADMIN_PARTNER_INQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'archived']
 const ADMIN_FAMILY_ROLES = ['owner', 'editor', 'viewer']
 const ADMIN_FAMILY_STATUSES = ['active', 'revoked']
+const ADMIN_MEMORIAL_VISIBILITIES = ['private', 'link', 'public']
 const SNAPSHOT_FIELD_LABELS = {
   displayName: '이름',
   years: '생몰연도',
@@ -441,6 +442,15 @@ let adminState = {
   },
   memberResults: [],
   memberSearchLoaded: false,
+  memorialSearch: {
+    query: '',
+    visibility: '',
+    memorialKind: '',
+    pageTemplate: '',
+    limit: '50',
+  },
+  memorialResults: [],
+  memorialSearchLoaded: false,
 }
 let state = {
   ...loadState(),
@@ -1074,6 +1084,51 @@ async function loadAdminMembers(search = adminState.memberSearch) {
   }
 }
 
+async function loadAdminMemorials(search = adminState.memorialSearch) {
+  if (!adminState.token.trim()) {
+    setAdminState((current) => ({
+      ...current,
+      memorialResults: [],
+      memorialSearchLoaded: false,
+      error: '관리자 토큰을 입력해주세요.',
+    }))
+    return
+  }
+
+  const params = new URLSearchParams()
+  if (search.query?.trim()) params.set('query', search.query.trim())
+  if (search.visibility?.trim()) params.set('visibility', search.visibility.trim())
+  if (search.memorialKind?.trim()) params.set('memorialKind', search.memorialKind.trim())
+  if (search.pageTemplate?.trim()) params.set('pageTemplate', search.pageTemplate.trim())
+  params.set('limit', String(Number(search.limit) || 50))
+
+  setAdminState((current) => ({
+    ...current,
+    memorialSearch: search,
+    isLoading: true,
+    error: '',
+  }))
+
+  try {
+    const memorials = await adminApiRequest(`/api/admin/memory/memorials?${params.toString()}`)
+    setAdminState((current) => ({
+      ...current,
+      isLoading: false,
+      error: '',
+      memorialResults: memorials,
+      memorialSearchLoaded: true,
+    }))
+  } catch (error) {
+    setAdminState((current) => ({
+      ...current,
+      isLoading: false,
+      error: error.message || '추모관 정보를 조회하지 못했습니다.',
+      memorialResults: [],
+      memorialSearchLoaded: false,
+    }))
+  }
+}
+
 function memoryBaseUrl() {
   const url = new URL(window.location.href)
 
@@ -1505,7 +1560,7 @@ function renderAdminSectionContent(section, dashboard) {
   }
 
   if (section === 'memorials') {
-    return renderAdminMemorialSection(dashboard.memorials)
+    return renderAdminMemorialLookup(dashboard.memorials)
   }
 
   if (section === 'data') {
@@ -1695,15 +1750,82 @@ function renderAdminPartnerStatusForm(item) {
   `
 }
 
-function renderAdminMemorialSection(items = []) {
+function renderAdminMemorialLookup(recentItems = []) {
+  const search = adminState.memorialSearch
+  const items = adminState.memorialSearchLoaded ? adminState.memorialResults : recentItems
+  const title = adminState.memorialSearchLoaded ? '추모관 검색 결과' : '최근 추모관'
+
+  return `
+    <section class="admin-section">
+      <div class="section-title">
+        <span class="eyebrow">추모관 관리</span>
+        <h2>전시관 공개 상태와 운영 지표 조회</h2>
+        <p>이름, slug, 지역, 유족 이름 또는 이메일로 추모관을 찾을 수 있습니다.</p>
+      </div>
+      <form class="admin-search-form" data-admin-memorial-search-form>
+        <label>
+          검색어
+          <input name="query" value="${escapeHtml(search.query)}" placeholder="이름, slug, 지역, 유족 계정" />
+        </label>
+        <label>
+          공개 범위
+          <select name="visibility">
+            <option value="">전체 공개 범위</option>
+            ${ADMIN_MEMORIAL_VISIBILITIES.map((visibility) => `
+              <option value="${escapeHtml(visibility)}" ${visibility === search.visibility ? 'selected' : ''}>
+                ${escapeHtml(adminStatusLabel(visibility))}
+              </option>
+            `).join('')}
+          </select>
+        </label>
+        <label>
+          기억 대상
+          <select name="memorialKind">
+            <option value="">전체 대상</option>
+            ${MEMORIAL_KINDS.map((kind) => `
+              <option value="${escapeHtml(kind.id)}" ${kind.id === search.memorialKind ? 'selected' : ''}>
+                ${escapeHtml(kind.label)}
+              </option>
+            `).join('')}
+          </select>
+        </label>
+        <label>
+          템플릿
+          <select name="pageTemplate">
+            <option value="">전체 템플릿</option>
+            ${PAGE_TEMPLATES.map((template) => `
+              <option value="${escapeHtml(template.id)}" ${template.id === search.pageTemplate ? 'selected' : ''}>
+                ${escapeHtml(template.label)}
+              </option>
+            `).join('')}
+          </select>
+        </label>
+        <label>
+          표시 개수
+          <select name="limit">
+            ${['20', '50', '100', '200'].map((limit) => `
+              <option value="${limit}" ${limit === search.limit ? 'selected' : ''}>${limit}개</option>
+            `).join('')}
+          </select>
+        </label>
+        <button type="submit" class="primary-button" ${adminState.isLoading ? 'disabled' : ''}>
+          ${adminState.isLoading ? '조회 중' : '추모관 조회'}
+        </button>
+      </form>
+    </section>
+    ${renderAdminMemorialSection(items, title)}
+  `
+}
+
+function renderAdminMemorialSection(items = [], title = '최근 추모관') {
   return `
     <section class="admin-section">
       <div class="section-title">
         <span class="eyebrow">Memory</span>
-        <h2>최근 추모관</h2>
+        <h2>${escapeHtml(title)}</h2>
       </div>
       ${renderAdminTable(
-        ['이름', '공개', '템플릿', '가족/대기/헌화', '생성'],
+        ['이름', '공개', '템플릿', '가족/대기/헌화', '관리', '생성'],
         items,
         (item) => `
           <tr>
@@ -1714,11 +1836,30 @@ function renderAdminMemorialSection(items = []) {
             <td>${renderAdminStatusPill(item.visibility)}</td>
             <td>${escapeHtml(adminTemplateLabel(item.pageTemplate))}</td>
             <td>${formatAdminNumber(item.activeFamilyMemberCount)} / ${formatAdminNumber(item.pendingGuestbookCount)} / ${formatAdminNumber(item.tributeOrderCount)}</td>
+            <td>${renderAdminMemorialForm(item)}</td>
             <td>${escapeHtml(formatDateTime(item.createdAt) || '-')}</td>
           </tr>
         `,
       )}
     </section>
+  `
+}
+
+function renderAdminMemorialForm(item) {
+  return `
+    <form class="admin-family-form" data-admin-memorial-form="${escapeHtml(item.id)}">
+      <label>
+        <span>공개 범위</span>
+        <select name="visibility" aria-label="${escapeHtml(item.displayName)} 공개 범위">
+          ${ADMIN_MEMORIAL_VISIBILITIES.map((visibility) => `
+            <option value="${escapeHtml(visibility)}" ${visibility === item.visibility ? 'selected' : ''}>
+              ${escapeHtml(adminStatusLabel(visibility))}
+            </option>
+          `).join('')}
+        </select>
+      </label>
+      <button type="submit" class="secondary-button" ${adminState.isLoading ? 'disabled' : ''}>저장</button>
+    </form>
   `
 }
 
@@ -4472,6 +4613,23 @@ function clearAdminToken() {
     isLoading: false,
     error: '',
     dashboard: null,
+    memberSearch: {
+      query: '',
+      role: '',
+      status: '',
+      limit: '50',
+    },
+    memberResults: [],
+    memberSearchLoaded: false,
+    memorialSearch: {
+      query: '',
+      visibility: '',
+      memorialKind: '',
+      pageTemplate: '',
+      limit: '50',
+    },
+    memorialResults: [],
+    memorialSearchLoaded: false,
   })
 }
 
@@ -4574,6 +4732,63 @@ async function handleAdminMemberSearchForm(event) {
   await loadAdminMembers(search)
 }
 
+async function handleAdminMemorialForm(event) {
+  event.preventDefault()
+
+  const form = event.currentTarget
+  const id = form.dataset.adminMemorialForm
+  const formData = new FormData(form)
+  const visibility = formData.get('visibility')?.toString().trim() ?? ''
+
+  if (!id || !ADMIN_MEMORIAL_VISIBILITIES.includes(visibility)) {
+    setAdminState((current) => ({
+      ...current,
+      error: '변경할 추모관 공개 범위를 확인해주세요.',
+    }))
+    return
+  }
+
+  setAdminState((current) => ({
+    ...current,
+    isLoading: true,
+    error: '',
+  }))
+
+  try {
+    await adminApiRequest(`/api/admin/memory/memorials/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ visibility }),
+    })
+    if (currentAdminSection() === 'memorials' && adminState.memorialSearchLoaded) {
+      await loadAdminMemorials()
+      return
+    }
+
+    await loadAdminDashboard()
+  } catch (error) {
+    setAdminState((current) => ({
+      ...current,
+      isLoading: false,
+      error: error.message || '추모관 공개 범위를 변경하지 못했습니다.',
+    }))
+  }
+}
+
+async function handleAdminMemorialSearchForm(event) {
+  event.preventDefault()
+
+  const formData = new FormData(event.currentTarget)
+  const search = {
+    query: formData.get('query')?.toString().trim() ?? '',
+    visibility: formData.get('visibility')?.toString().trim() ?? '',
+    memorialKind: formData.get('memorialKind')?.toString().trim() ?? '',
+    pageTemplate: formData.get('pageTemplate')?.toString().trim() ?? '',
+    limit: formData.get('limit')?.toString().trim() || '50',
+  }
+
+  await loadAdminMemorials(search)
+}
+
 function bindGlobalEvents() {
   app.querySelector('[data-admin-token-form]')?.addEventListener('submit', handleAdminTokenForm)
   app.querySelector('[data-admin-refresh]')?.addEventListener('click', () => loadAdminDashboard())
@@ -4581,11 +4796,17 @@ function bindGlobalEvents() {
   app
     .querySelector('[data-admin-member-search-form]')
     ?.addEventListener('submit', handleAdminMemberSearchForm)
+  app
+    .querySelector('[data-admin-memorial-search-form]')
+    ?.addEventListener('submit', handleAdminMemorialSearchForm)
   app.querySelectorAll('[data-admin-partner-status-form]').forEach((form) => {
     form.addEventListener('submit', handleAdminPartnerStatusForm)
   })
   app.querySelectorAll('[data-admin-family-member-form]').forEach((form) => {
     form.addEventListener('submit', handleAdminFamilyMemberForm)
+  })
+  app.querySelectorAll('[data-admin-memorial-form]').forEach((form) => {
+    form.addEventListener('submit', handleAdminMemorialForm)
   })
 
   app
