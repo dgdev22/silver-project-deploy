@@ -181,6 +181,43 @@ print(f"PASS {label}: totalCount {total_count} >= {min_count}")
 PY
 }
 
+assert_sitemap_routes() {
+  local file="$1"
+  shift
+
+  python3 - "$file" "$@" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+from urllib.parse import urlparse
+
+path = sys.argv[1]
+required_routes = sys.argv[2:]
+
+try:
+    root = ET.parse(path).getroot()
+except Exception as exc:
+    print(f"FAIL sitemap: invalid XML: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+routes = set()
+for element in root.iter():
+    if not element.tag.endswith("loc") or not element.text:
+        continue
+    parsed = urlparse(element.text.strip())
+    routes.add(parsed.path or "/")
+
+missing_routes = [route for route in required_routes if route not in routes]
+if missing_routes:
+    print(
+        "FAIL sitemap: missing routes " + ", ".join(missing_routes),
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+print(f"PASS sitemap: routes {len(required_routes)} required, {len(routes)} listed")
+PY
+}
+
 assert_map_contract() {
   local label="$1"
   local file="$2"
@@ -345,12 +382,28 @@ echo "Region:   $SMOKE_REGION"
 echo "Min total: $SMOKE_MIN_TOTAL_COUNT"
 echo "Min layers: $SMOKE_MIN_LAYER_COUNT"
 
-for path in "/" "/learning" "/tour" "/mobility" "/health" "/contest/food" "/contest/mobility"; do
+for path in "/" "/learning" "/tour" "/mobility" "/health" "/contest/education" "/contest/food" "/contest/mobility"; do
   page_name="$(echo "$path" | tr '/-' '__')"
   body="$(curl_body "page_${page_name}" "${BASE_URL}${path}" 200)"
   assert_contains "$body" "root\\|Silver\\|script" "Page $path should look like app HTML"
   echo "PASS page $path"
 done
+
+robots_body="$(curl_body robots_txt "${BASE_URL}/robots.txt" 200)"
+assert_contains "$robots_body" "Sitemap:.*sitemap.xml" "robots.txt should point to sitemap.xml"
+echo "PASS robots.txt"
+
+sitemap_body="$(curl_body sitemap_xml "${BASE_URL}/sitemap.xml" 200)"
+assert_sitemap_routes \
+  "$sitemap_body" \
+  "/" \
+  "/learning" \
+  "/tour" \
+  "/mobility" \
+  "/health" \
+  "/contest/education" \
+  "/contest/food" \
+  "/contest/mobility"
 
 education_body="$(curl_body education_map "${API_BASE_URL}/api/education-experience-map?region=${ENCODED_REGION}&perCategoryLimit=1" 200)"
 assert_json "$education_body" "education map API should return JSON"
