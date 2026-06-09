@@ -99,6 +99,17 @@ assert_contains() {
   fi
 }
 
+assert_contest_static_meta() {
+  local label="$1"
+  local file="$2"
+  local expected_title="$3"
+
+  assert_contains "$file" "<title>${expected_title}</title>" "$label should include static contest title before JavaScript runs"
+  assert_contains "$file" "property=\"og:title\"" "$label should include Open Graph title"
+  assert_contains "$file" "$expected_title" "$label should include contest title text"
+  echo "PASS $label static metadata"
+}
+
 assert_json() {
   local file="$1"
   local message="$2"
@@ -388,6 +399,24 @@ for path in "/" "/learning" "/tour" "/mobility" "/health" "/contest/education" "
   assert_contains "$body" "root\\|Silver\\|script" "Page $path should look like app HTML"
   echo "PASS page $path"
 done
+
+contest_education_body="$(curl_body contest_education_static_meta "${BASE_URL}/contest/education" 200)"
+assert_contest_static_meta \
+  "contest education page" \
+  "$contest_education_body" \
+  "Silver Smile 공모전 제출용 | 2026 교육 공공데이터 활용대회"
+
+contest_food_body="$(curl_body contest_food_static_meta "${BASE_URL}/contest/food" 200)"
+assert_contest_static_meta \
+  "contest food page" \
+  "$contest_food_body" \
+  "Silver Smile 공모전 제출용 | 2026 식의약 공공데이터·AI 분석·활용 경진대회"
+
+contest_mobility_body="$(curl_body contest_mobility_static_meta "${BASE_URL}/contest/mobility" 200)"
+assert_contest_static_meta \
+  "contest mobility page" \
+  "$contest_mobility_body" \
+  "Silver Smile 공모전 제출용 | 2026 국토·교통 데이터 활용 경진대회"
 
 robots_body="$(curl_body robots_txt "${BASE_URL}/robots.txt" 200)"
 assert_contains "$robots_body" "Sitemap:.*sitemap.xml" "robots.txt should point to sitemap.xml"
