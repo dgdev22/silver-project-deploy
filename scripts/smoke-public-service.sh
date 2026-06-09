@@ -400,6 +400,10 @@ for path in "/" "/learning" "/tour" "/mobility" "/health" "/contest/education" "
   echo "PASS page $path"
 done
 
+internal_denied="$(curl_body internal_collector_runs_denied "${BASE_URL}/internal/collector-runs" 404)"
+assert_contains "$internal_denied" "404\\|Not Found" "Internal collector runs should not be exposed publicly"
+echo "PASS internal route protection"
+
 contest_education_body="$(curl_body contest_education_static_meta "${BASE_URL}/contest/education" 200)"
 assert_contest_static_meta \
   "contest education page" \
