@@ -66,6 +66,44 @@ jobs:
           chmod 600 ~/.ssh/lightsail_key
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
+      - name: Validate refresh inputs
+        env:
+          SILVER_REFRESH_MODE: ${{ inputs.mode }}
+          SILVER_REFRESH_REGIONS: ${{ inputs.regions }}
+          SILVER_REFRESH_LIMIT: ${{ inputs.limit }}
+          SILVER_MFDS_PAUSE_SECONDS: ${{ inputs.mfds_pause_seconds }}
+        run: |
+          set -euo pipefail
+
+          case "$SILVER_REFRESH_MODE" in
+            education|core|food|full)
+              ;;
+            *)
+              echo "mode must be one of: education, core, food, full" >&2
+              exit 1
+              ;;
+          esac
+
+          if [ -z "${SILVER_REFRESH_REGIONS//[[:space:],]/}" ]; then
+            echo "regions must include at least one region." >&2
+            exit 1
+          fi
+
+          if [[ "$SILVER_REFRESH_REGIONS" == *$'\n'* || "$SILVER_REFRESH_REGIONS" == *$'\r'* ]]; then
+            echo "regions must not include line breaks." >&2
+            exit 1
+          fi
+
+          if ! [[ "$SILVER_REFRESH_LIMIT" =~ ^[1-9][0-9]*$ ]]; then
+            echo "limit must be a positive integer." >&2
+            exit 1
+          fi
+
+          if ! [[ "$SILVER_MFDS_PAUSE_SECONDS" =~ ^[0-9]+$ ]]; then
+            echo "mfds_pause_seconds must be a non-negative integer." >&2
+            exit 1
+          fi
+
       - name: Refresh data on Lightsail
         env:
           SILVER_REFRESH_MODE: ${{ inputs.mode }}
@@ -73,6 +111,17 @@ jobs:
           SILVER_REFRESH_LIMIT: ${{ inputs.limit }}
           SILVER_MFDS_PAUSE_SECONDS: ${{ inputs.mfds_pause_seconds }}
         run: |
+          set -euo pipefail
+
+          quote() {
+            printf "%q" "$1"
+          }
+
+          remote_mode="$(quote "$SILVER_REFRESH_MODE")"
+          remote_regions="$(quote "$SILVER_REFRESH_REGIONS")"
+          remote_limit="$(quote "$SILVER_REFRESH_LIMIT")"
+          remote_mfds_pause="$(quote "$SILVER_MFDS_PAUSE_SECONDS")"
+
           ssh -i ~/.ssh/lightsail_key \
             "$SSH_TARGET" \
-            "SILVER_REFRESH_MODE='$SILVER_REFRESH_MODE' SILVER_REFRESH_REGIONS='$SILVER_REFRESH_REGIONS' SILVER_REFRESH_LIMIT='$SILVER_REFRESH_LIMIT' SILVER_MFDS_PAUSE_SECONDS='$SILVER_MFDS_PAUSE_SECONDS' bash -lc 'cd ~/apps/silverProject/deploy && git pull --ff-only && chmod +x scripts/*.sh && ./scripts/refresh-data.sh'"
+            "SILVER_REFRESH_MODE=$remote_mode SILVER_REFRESH_REGIONS=$remote_regions SILVER_REFRESH_LIMIT=$remote_limit SILVER_MFDS_PAUSE_SECONDS=$remote_mfds_pause bash -lc 'cd ~/apps/silverProject/deploy && git pull --ff-only && chmod +x scripts/*.sh && ./scripts/refresh-data.sh'"

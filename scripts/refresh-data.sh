@@ -11,6 +11,53 @@ MFDS_PAUSE_SECONDS="${SILVER_MFDS_PAUSE_SECONDS:-30}"
 LOCK_FILE="${SILVER_REFRESH_LOCK_FILE:-/tmp/silver-data-refresh.lock}"
 LOCK_WAIT_SECONDS="${SILVER_REFRESH_LOCK_WAIT_SECONDS:-900}"
 
+validate_positive_integer() {
+  local label="$1"
+  local value="$2"
+
+  if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "$label must be a positive integer: $value" >&2
+    exit 1
+  fi
+}
+
+validate_non_negative_integer() {
+  local label="$1"
+  local value="$2"
+
+  if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+    echo "$label must be a non-negative integer: $value" >&2
+    exit 1
+  fi
+}
+
+validate_inputs() {
+  case "$MODE" in
+    education|core|food|full)
+      ;;
+    *)
+      echo "Unknown SILVER_REFRESH_MODE: $MODE. Use education, core, food, or full." >&2
+      exit 1
+      ;;
+  esac
+
+  if [ -z "${REGIONS//[[:space:],]/}" ]; then
+    echo "SILVER_REFRESH_REGIONS must include at least one region." >&2
+    exit 1
+  fi
+
+  if [[ "$REGIONS" == *$'\n'* || "$REGIONS" == *$'\r'* ]]; then
+    echo "SILVER_REFRESH_REGIONS must not include line breaks." >&2
+    exit 1
+  fi
+
+  validate_positive_integer "SILVER_REFRESH_LIMIT" "$LIMIT"
+  validate_non_negative_integer "SILVER_MFDS_PAUSE_SECONDS" "$MFDS_PAUSE_SECONDS"
+  validate_positive_integer "SILVER_REFRESH_LOCK_WAIT_SECONDS" "$LOCK_WAIT_SECONDS"
+}
+
+validate_inputs
+
 if [ "${SILVER_REFRESH_LOCKED:-0}" != "1" ]; then
   if command -v flock >/dev/null 2>&1; then
     export SILVER_REFRESH_LOCKED=1
@@ -97,10 +144,6 @@ case "$MODE" in
     refresh_food_safety
     run_collector silver-data-collector score-education-experience
     run_collector silver-data-collector score-contest-menus
-    ;;
-  *)
-    echo "Unknown SILVER_REFRESH_MODE: $MODE. Use education, core, food, or full." >&2
-    exit 1
     ;;
 esac
 

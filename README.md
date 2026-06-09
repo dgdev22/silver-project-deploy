@@ -28,6 +28,8 @@ Silver Memory 운영 백오피스는 `/memory/#/admin`에서 열고, `.env.prod`
 
 `scripts/refresh-data.sh`는 cron, 수동 workflow, 서버 직접 실행이 겹쳐도 한 번에 하나만 실행되도록 `/tmp/silver-data-refresh.lock`을 사용합니다. 필요하면 `SILVER_REFRESH_LOCK_FILE`, `SILVER_REFRESH_LOCK_WAIT_SECONDS`로 조정합니다.
 
+데이터 갱신 mode는 `education`, `core`, `food`, `full`만 허용합니다. `SILVER_REFRESH_LIMIT`은 양의 정수, `SILVER_MFDS_PAUSE_SECONDS`는 0 이상의 정수여야 합니다. GitHub Actions 수동 갱신 workflow도 같은 입력 검증 후 shell-safe quoting으로 서버에 값을 전달합니다.
+
 배포 후 읽기 전용 스모크 테스트까지 자동으로 돌리려면 서버에서 아래처럼 실행합니다.
 
 ```bash
