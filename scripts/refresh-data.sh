@@ -148,7 +148,6 @@ case "$MODE" in
 esac
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T backend \
-  wget -qO- --post-data='' \
-  "http://localhost:8080/internal/import/processed-json?directory=/data/processed"
+  sh -c 'wget -qO- --header="X-Silver-Admin-Token: ${SILVER_ADMIN_TOKEN}" --post-data="" "http://localhost:8080/internal/import/processed-json?directory=/data/processed"'
 
 echo "Data refresh complete. mode=$MODE regions=$REGIONS limit=$LIMIT"
