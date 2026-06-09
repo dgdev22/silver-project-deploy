@@ -16,6 +16,8 @@ SMOKE_RETRIES="${SILVER_SMOKE_RETRIES:-6}"
 SMOKE_RETRY_SLEEP_SECONDS="${SILVER_SMOKE_RETRY_SLEEP_SECONDS:-2}"
 SMOKE_MIN_TOTAL_COUNT="${SILVER_SMOKE_MIN_TOTAL_COUNT:-1}"
 SMOKE_MIN_LAYER_COUNT="${SILVER_SMOKE_MIN_LAYER_COUNT:-1}"
+SMOKE_ALLOWED_FRESHNESS_STATUSES="${SILVER_SMOKE_ALLOWED_FRESHNESS_STATUSES:-fresh,aging}"
+SMOKE_MAX_DATA_AGE_HOURS="${SILVER_SMOKE_MAX_DATA_AGE_HOURS:-168}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -353,13 +355,36 @@ PY
 assert_data_freshness_contract() {
   local file="$1"
   local min_active_count="$2"
+  local allowed_statuses="$3"
+  local max_age_hours="$4"
 
-  python3 - "$file" "$min_active_count" <<'PY'
+  python3 - "$file" "$min_active_count" "$allowed_statuses" "$max_age_hours" <<'PY'
 import json
 import sys
 
 path = sys.argv[1]
 min_active_count = int(sys.argv[2])
+allowed_statuses = {
+    status.strip()
+    for status in sys.argv[3].split(",")
+    if status.strip()
+}
+if not allowed_statuses:
+    print(
+        "FAIL data freshness API: allowed freshness statuses should not be empty",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+max_age_hours = None
+if sys.argv[4].strip():
+    try:
+        max_age_hours = int(sys.argv[4])
+    except ValueError:
+        print(
+            f"FAIL data freshness API: max age should be an integer hour value, got {sys.argv[4]!r}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 with open(path, encoding="utf-8") as handle:
     data = json.load(handle)
@@ -368,14 +393,28 @@ if not isinstance(data, dict):
     print("FAIL data freshness API: expected object response", file=sys.stderr)
     sys.exit(1)
 
-allowed_statuses = {"fresh", "aging", "stale", "no_data"}
 status = data.get("status")
 if status not in allowed_statuses:
     print(
-        f"FAIL data freshness API: status should be one of {sorted(allowed_statuses)}, got {status!r}",
+        f"FAIL data freshness API: status {status!r} is not allowed. Allowed statuses: {sorted(allowed_statuses)}",
         file=sys.stderr,
     )
     sys.exit(1)
+
+age_hours = data.get("ageHours")
+if max_age_hours is not None:
+    if not isinstance(age_hours, int):
+        print(
+            f"FAIL data freshness API: ageHours should be an integer when max age is enforced, got {age_hours!r}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if age_hours > max_age_hours:
+        print(
+            f"FAIL data freshness API: data age {age_hours}h is above maximum {max_age_hours}h",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 active_item_count = data.get("activeItemCount")
 if not isinstance(active_item_count, int) or active_item_count < min_active_count:
@@ -422,7 +461,7 @@ if not isinstance(recent_runs, list):
     sys.exit(1)
 
 print(
-    f"PASS data freshness API: status {status}, activeItemCount {active_item_count}, types {len(type_summaries)}, recentRuns {len(recent_runs)}"
+    f"PASS data freshness API: status {status}, ageHours {age_hours}, activeItemCount {active_item_count}, types {len(type_summaries)}, recentRuns {len(recent_runs)}"
 )
 PY
 }
@@ -477,6 +516,8 @@ echo "API base: $API_BASE_URL"
 echo "Region:   $SMOKE_REGION"
 echo "Min total: $SMOKE_MIN_TOTAL_COUNT"
 echo "Min layers: $SMOKE_MIN_LAYER_COUNT"
+echo "Allowed freshness statuses: $SMOKE_ALLOWED_FRESHNESS_STATUSES"
+echo "Max data age hours: $SMOKE_MAX_DATA_AGE_HOURS"
 
 for path in "/" "/learning" "/tour" "/mobility" "/health" "/contest/education" "/contest/food" "/contest/mobility"; do
   page_name="$(echo "$path" | tr '/-' '__')"
@@ -552,7 +593,11 @@ assert_map_contract "health map API" "$health_body" "$SMOKE_MIN_LAYER_COUNT"
 data_freshness_body="$(curl_body data_freshness "${API_BASE_URL}/api/data-freshness" 200)"
 assert_json "$data_freshness_body" "data freshness API should return JSON"
 print_json_summary "data freshness API" "$data_freshness_body"
-assert_data_freshness_contract "$data_freshness_body" "$SMOKE_MIN_TOTAL_COUNT"
+assert_data_freshness_contract \
+  "$data_freshness_body" \
+  "$SMOKE_MIN_TOTAL_COUNT" \
+  "$SMOKE_ALLOWED_FRESHNESS_STATUSES" \
+  "$SMOKE_MAX_DATA_AGE_HOURS"
 
 admin_denied="$(curl_body admin_dashboard_denied "${API_BASE_URL}/api/admin/dashboard" 403)"
 assert_contains "$admin_denied" "Invalid admin token\\|Forbidden\\|403" "Admin dashboard should reject missing token"
