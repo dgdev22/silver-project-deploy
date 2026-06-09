@@ -8,6 +8,17 @@ REGIONS="${SILVER_REFRESH_REGIONS:-${SILVER_REFRESH_REGION:-강릉}}"
 LIMIT="${SILVER_REFRESH_LIMIT:-5}"
 MODE="${SILVER_REFRESH_MODE:-full}"
 MFDS_PAUSE_SECONDS="${SILVER_MFDS_PAUSE_SECONDS:-30}"
+LOCK_FILE="${SILVER_REFRESH_LOCK_FILE:-/tmp/silver-data-refresh.lock}"
+LOCK_WAIT_SECONDS="${SILVER_REFRESH_LOCK_WAIT_SECONDS:-900}"
+
+if [ "${SILVER_REFRESH_LOCKED:-0}" != "1" ]; then
+  if command -v flock >/dev/null 2>&1; then
+    export SILVER_REFRESH_LOCKED=1
+    exec flock -w "$LOCK_WAIT_SECONDS" "$LOCK_FILE" "$0" "$@"
+  fi
+
+  echo "WARN flock is not available; continuing without refresh lock." >&2
+fi
 
 cd "$APP_DIR"
 
