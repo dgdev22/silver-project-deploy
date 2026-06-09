@@ -1,0 +1,41 @@
+name: Public service smoke
+
+on:
+  schedule:
+    # 06:30 KST. Runs after the server-side 03:00 core data refresh cron.
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: silver-public-service-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    if: ${{ vars.SILVER_PUBLIC_SMOKE_ENABLED != 'false' }}
+    timeout-minutes: 10
+
+    env:
+      SILVER_BASE_URL: ${{ vars.SILVER_BASE_URL }}
+      SILVER_API_BASE_URL: ${{ vars.SILVER_API_BASE_URL }}
+      SILVER_SMOKE_ALLOWED_FRESHNESS_STATUSES: ${{ vars.SILVER_SMOKE_ALLOWED_FRESHNESS_STATUSES }}
+      SILVER_SMOKE_MAX_DATA_AGE_HOURS: ${{ vars.SILVER_SMOKE_MAX_DATA_AGE_HOURS }}
+      SILVER_SMOKE_MIN_TOTAL_COUNT: ${{ vars.SILVER_SMOKE_MIN_TOTAL_COUNT }}
+      SILVER_SMOKE_MIN_LAYER_COUNT: ${{ vars.SILVER_SMOKE_MIN_LAYER_COUNT }}
+      SILVER_SMOKE_REGION: ${{ vars.SILVER_SMOKE_REGION }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate deploy config
+        run: |
+          chmod +x scripts/*.sh
+          ./scripts/validate-deploy-config.sh
+
+      - name: Run public smoke test
+        run: |
+          set -euo pipefail
+          base_url="${SILVER_BASE_URL:-https://silver.loopmateapp.com}"
+          ./scripts/smoke-public-service.sh "$base_url"
