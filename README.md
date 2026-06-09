@@ -31,7 +31,7 @@ Silver Memory 운영 백오피스는 `/memory/#/admin`에서 열고, `.env.prod`
 
 데이터 갱신 mode는 `education`, `core`, `food`, `full`만 허용합니다. `SILVER_REFRESH_LIMIT`은 양의 정수, `SILVER_MFDS_PAUSE_SECONDS`는 0 이상의 정수여야 합니다. GitHub Actions 수동 갱신 workflow도 같은 입력 검증 후 shell-safe quoting으로 서버에 값을 전달합니다.
 
-`scripts/backup-postgres.sh`는 운영 PostgreSQL을 custom-format dump로 백업합니다. `scripts/install-cron.sh`를 실행하면 매일 02:30 KST 백업 cron도 함께 설치됩니다. 복원 절차와 업로드 volume 주의사항은 `docs/backup-restore.md`를 따릅니다.
+`scripts/backup-postgres.sh`는 운영 PostgreSQL을 custom-format dump로 백업합니다. `scripts/backup-volumes.sh`는 Memory 업로드와 collector 데이터 Docker volume을 `tar.gz`로 백업합니다. `scripts/install-cron.sh`를 실행하면 매일 02:30 KST DB 백업, 02:40 KST volume 백업 cron도 함께 설치됩니다. 복원 절차는 `docs/backup-restore.md`를 따릅니다.
 
 배포 후 읽기 전용 스모크 테스트까지 자동으로 돌리려면 서버에서 아래처럼 실행합니다.
 
