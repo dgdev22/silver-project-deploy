@@ -45,6 +45,12 @@ echo "Running post-deploy smoke tests for $BASE_URL"
 
 "$DEPLOY_DIR/scripts/smoke-public-service.sh" "$BASE_URL"
 
+if [ "${SILVER_SKIP_INTERNAL_SMOKE:-0}" = "1" ]; then
+  echo "SKIP internal smoke test. SILVER_SKIP_INTERNAL_SMOKE=1"
+else
+  "$DEPLOY_DIR/scripts/smoke-internal-service.sh"
+fi
+
 if [ "${SILVER_SKIP_MEMORY_SMOKE:-0}" = "1" ]; then
   echo "SKIP memory smoke test. SILVER_SKIP_MEMORY_SMOKE=1"
 else
