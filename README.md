@@ -44,7 +44,7 @@ SILVER_DEPLOY_SMOKE=1 ./scripts/deploy-app.sh
 
 ## Smoke Tests
 
-Silver Smile 공공데이터 서비스 읽기 전용 점검. 주요 페이지, 공모전 URL별 정적 메타, `/internal` 공개 차단, `robots.txt`, `sitemap.xml`, 지도 API, 관리자 보호 상태, 관광 후기 읽기 API를 확인합니다.
+Silver Smile 공공데이터 서비스 읽기 전용 점검. 주요 페이지, 공모전 URL별 정적 메타, frontend/API base의 `/internal` 공개 차단, `robots.txt`, `sitemap.xml`, 지도 API, 관리자 보호 상태, 관광 후기 읽기 API를 확인합니다.
 
 ```bash
 ./scripts/smoke-public-service.sh https://silver.loopmateapp.com

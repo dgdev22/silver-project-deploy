@@ -110,6 +110,16 @@ assert_contest_static_meta() {
   echo "PASS $label static metadata"
 }
 
+assert_internal_route_protected() {
+  local label="$1"
+  local base_url="$2"
+  local body
+
+  body="$(curl_body "internal_${label}_collector_runs_denied" "${base_url}/internal/collector-runs" 404)"
+  assert_contains "$body" "404\\|Not Found" "Internal collector runs should not be exposed publicly on $label"
+  echo "PASS $label internal route protection"
+}
+
 assert_json() {
   local file="$1"
   local message="$2"
@@ -400,9 +410,11 @@ for path in "/" "/learning" "/tour" "/mobility" "/health" "/contest/education" "
   echo "PASS page $path"
 done
 
-internal_denied="$(curl_body internal_collector_runs_denied "${BASE_URL}/internal/collector-runs" 404)"
-assert_contains "$internal_denied" "404\\|Not Found" "Internal collector runs should not be exposed publicly"
-echo "PASS internal route protection"
+assert_internal_route_protected "frontend" "$BASE_URL"
+
+if [ "$API_BASE_URL" != "$BASE_URL" ]; then
+  assert_internal_route_protected "api" "$API_BASE_URL"
+fi
 
 contest_education_body="$(curl_body contest_education_static_meta "${BASE_URL}/contest/education" 200)"
 assert_contest_static_meta \
