@@ -9,6 +9,8 @@ RETENTION_DAYS="${SILVER_VOLUME_BACKUP_RETENTION_DAYS:-30}"
 LOCK_FILE="${SILVER_VOLUME_BACKUP_LOCK_FILE:-/tmp/silver-volume-backup.lock}"
 BACKUP_IMAGE="${SILVER_VOLUME_BACKUP_IMAGE:-postgres:17-alpine}"
 VOLUMES="${SILVER_VOLUME_BACKUP_VOLUMES:-memory-uploads collector-data}"
+HOST_UID="$(id -u)"
+HOST_GID="$(id -g)"
 
 if ! [[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]]; then
   echo "SILVER_VOLUME_BACKUP_RETENTION_DAYS must be a non-negative integer." >&2
@@ -76,7 +78,7 @@ backup_volume() {
     -v "$volume_name:/source:ro" \
     -v "$BACKUP_DIR:/backup" \
     "$BACKUP_IMAGE" \
-    sh -c "cd /source && tar -czf /backup/$tmp_basename ."
+    sh -c "cd /source && tar -czf /backup/$tmp_basename . && chown $HOST_UID:$HOST_GID /backup/$tmp_basename"
 
   mv "$tmp_archive" "$archive_file"
   chmod 600 "$archive_file"
