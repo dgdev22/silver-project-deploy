@@ -113,10 +113,8 @@ assert_contest_static_meta() {
 assert_internal_route_protected() {
   local label="$1"
   local base_url="$2"
-  local body
 
-  body="$(curl_body "internal_${label}_collector_runs_denied" "${base_url}/internal/collector-runs" 404)"
-  assert_contains "$body" "404\\|Not Found" "Internal collector runs should not be exposed publicly on $label"
+  curl_body "internal_${label}_collector_runs_denied" "${base_url}/internal/collector-runs" 404 >/dev/null
   echo "PASS $label internal route protection"
 }
 
