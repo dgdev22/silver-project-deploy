@@ -1,6 +1,6 @@
 # GitHub Actions Deploy
 
-Last updated: 2026-05-28
+Last updated: 2026-06-10
 
 main branch에 push되면 Lightsail 서버에서 최신 코드를 pull하고 Docker Compose 서비스를 다시 띄우는 자동 배포 구성이다.
 
@@ -40,6 +40,8 @@ GitHub repository의 Settings -> Secrets and variables -> Actions -> New reposit
 |---|---|
 | `LIGHTSAIL_DEPLOY_ENABLED` | `false`로 두면 자동 배포를 일시 중지 |
 | `LIGHTSAIL_DEPLOY_SMOKE` | `true`로 두면 main push 배포 뒤 읽기 전용 smoke test까지 실행 |
+| `SILVER_PUBLIC_SMOKE_ENABLED` | `false`로 두면 매일 공개 URL smoke를 일시 중지 |
+| `SILVER_OPERATIONS_SMOKE_ENABLED` | `false`로 두면 매일 Lightsail 운영 smoke를 일시 중지 |
 
 현재 workflow는 기본적으로 main push 시 배포를 실행한다. 임시로 막고 싶을 때만 `LIGHTSAIL_DEPLOY_ENABLED=false`를 넣는다. push마다 smoke test까지 돌리고 싶을 때만 `LIGHTSAIL_DEPLOY_SMOKE=true`를 넣는다.
 
@@ -58,10 +60,12 @@ cat ~/.ssh/github_actions_silver_deploy
 
 ## Workflows
 
-`silver-project-deploy`에는 두 workflow가 있다.
+`silver-project-deploy`에는 네 workflow가 있다.
 
 - `.github/workflows/deploy.yml`: main push 또는 수동 실행 시 코드 배포. 수동 실행은 `run_smoke=true`가 기본값이다.
 - `.github/workflows/refresh-data.yml`: 수동 실행 시 공공데이터 재수집/import. 기본 입력은 `mode=education`, `regions=강릉`, `limit=20`
+- `.github/workflows/public-smoke.yml`: 매일 06:30 KST 공개 URL, 지도 API, 데이터 신선도 smoke.
+- `.github/workflows/operations-smoke.yml`: 매일 08:00 KST Lightsail에서 public/internal/Memory/백업 신선도 smoke.
 
 다른 repository도 main push마다 자동 배포하려면 같은 `deploy.yml`을 추가한다.
 
