@@ -29,6 +29,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate deploy config
+        run: |
+          chmod +x scripts/*.sh
+          ./scripts/validate-deploy-config.sh
+
       - name: Prepare SSH config
         env:
           LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
