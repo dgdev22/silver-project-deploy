@@ -88,6 +88,31 @@ cron 로그 기본 위치:
 ~/apps/silverProject/logs/backup-volumes.log
 ```
 
+## Freshness Check
+
+서버에서 최신 백업이 존재하고 충분히 최근인지 확인한다.
+
+```bash
+cd ~/apps/silverProject/deploy
+./scripts/check-backups.sh
+```
+
+기본 기준:
+
+- PostgreSQL dump: 48시간 이내, 1KB 이상
+- `memory-uploads`, `collector-data` archive: 48시간 이내, 20B 이상
+
+조정 가능한 환경변수:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SILVER_BACKUP_MAX_AGE_HOURS` | `48` | PostgreSQL 최신 백업 허용 나이. `0`이면 나이 검사 안 함 |
+| `SILVER_VOLUME_BACKUP_MAX_AGE_HOURS` | `48` | volume 최신 백업 허용 나이. `0`이면 나이 검사 안 함 |
+| `SILVER_BACKUP_MIN_BYTES` | `1024` | PostgreSQL dump 최소 크기 |
+| `SILVER_VOLUME_BACKUP_MIN_BYTES` | `20` | volume archive 최소 크기 |
+
+`scripts/smoke-after-deploy.sh`는 기본적으로 이 검사를 함께 실행한다. 배포 직후 첫 백업 전 환경에서만 `SILVER_SKIP_BACKUP_CHECK=1`로 건너뛸 수 있다.
+
 ## Restore Drill
 
 복원은 운영 DB를 덮어쓰는 작업이다. 실제 운영에서 실행하기 전에 최신 백업 파일을 별도 위치에 보관하고, 가능한 경우 새 서버나 임시 DB에서 먼저 검증한다.

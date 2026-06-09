@@ -57,4 +57,10 @@ else
   "$DEPLOY_DIR/scripts/smoke-memory.sh" "$BASE_URL"
 fi
 
+if [ "${SILVER_SKIP_BACKUP_CHECK:-0}" = "1" ]; then
+  echo "SKIP backup freshness check. SILVER_SKIP_BACKUP_CHECK=1"
+else
+  "$DEPLOY_DIR/scripts/check-backups.sh"
+fi
+
 echo "Post-deploy smoke tests complete."

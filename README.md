@@ -33,6 +33,8 @@ Silver Memory 운영 백오피스는 `/memory/#/admin`에서 열고, `.env.prod`
 
 `scripts/backup-postgres.sh`는 운영 PostgreSQL을 custom-format dump로 백업합니다. `scripts/backup-volumes.sh`는 Memory 업로드와 collector 데이터 Docker volume을 `tar.gz`로 백업합니다. `scripts/install-cron.sh`를 실행하면 매일 02:30 KST DB 백업, 02:40 KST volume 백업 cron도 함께 설치됩니다. 복원 절차는 `docs/backup-restore.md`를 따릅니다.
 
+`scripts/check-backups.sh`는 최신 DB/volume 백업이 존재하고 기본 48시간 이내인지 확인합니다. `scripts/smoke-after-deploy.sh`도 이 검사를 함께 실행하며, 첫 백업 전 환경에서는 `SILVER_SKIP_BACKUP_CHECK=1`로 건너뜁니다.
+
 배포 후 읽기 전용 스모크 테스트까지 자동으로 돌리려면 서버에서 아래처럼 실행합니다.
 
 ```bash
