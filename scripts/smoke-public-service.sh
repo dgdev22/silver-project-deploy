@@ -350,6 +350,83 @@ print(
 PY
 }
 
+assert_data_freshness_contract() {
+  local file="$1"
+  local min_active_count="$2"
+
+  python3 - "$file" "$min_active_count" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+min_active_count = int(sys.argv[2])
+
+with open(path, encoding="utf-8") as handle:
+    data = json.load(handle)
+
+if not isinstance(data, dict):
+    print("FAIL data freshness API: expected object response", file=sys.stderr)
+    sys.exit(1)
+
+allowed_statuses = {"fresh", "aging", "stale", "no_data"}
+status = data.get("status")
+if status not in allowed_statuses:
+    print(
+        f"FAIL data freshness API: status should be one of {sorted(allowed_statuses)}, got {status!r}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+active_item_count = data.get("activeItemCount")
+if not isinstance(active_item_count, int) or active_item_count < min_active_count:
+    print(
+        f"FAIL data freshness API: activeItemCount {active_item_count!r} is below minimum {min_active_count}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+mappable_item_count = data.get("mappableItemCount")
+if (
+    not isinstance(mappable_item_count, int)
+    or mappable_item_count < 0
+    or mappable_item_count > active_item_count
+):
+    print(
+        "FAIL data freshness API: mappableItemCount should be between 0 and activeItemCount",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+type_summaries = data.get("typeSummaries")
+if not isinstance(type_summaries, list) or not type_summaries:
+    print("FAIL data freshness API: typeSummaries should be a non-empty list", file=sys.stderr)
+    sys.exit(1)
+
+for index, summary in enumerate(type_summaries):
+    if not isinstance(summary, dict):
+        print(f"FAIL data freshness API: type summary #{index + 1} should be an object", file=sys.stderr)
+        sys.exit(1)
+    if not isinstance(summary.get("type"), str) or not summary["type"].strip():
+        print(f"FAIL data freshness API: type summary #{index + 1} should include type", file=sys.stderr)
+        sys.exit(1)
+    if not isinstance(summary.get("activeItemCount"), int) or summary["activeItemCount"] < 0:
+        print(
+            f"FAIL data freshness API: type summary #{index + 1} activeItemCount should be non-negative",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+recent_runs = data.get("recentCollectorRuns")
+if not isinstance(recent_runs, list):
+    print("FAIL data freshness API: recentCollectorRuns should be a list", file=sys.stderr)
+    sys.exit(1)
+
+print(
+    f"PASS data freshness API: status {status}, activeItemCount {active_item_count}, types {len(type_summaries)}, recentRuns {len(recent_runs)}"
+)
+PY
+}
+
 extract_backend_id() {
   local file="$1"
 
@@ -471,6 +548,11 @@ assert_json "$health_body" "health map API should return JSON"
 print_json_summary "health map API" "$health_body"
 assert_total_count_at_least "health map API" "$health_body" "$SMOKE_MIN_TOTAL_COUNT"
 assert_map_contract "health map API" "$health_body" "$SMOKE_MIN_LAYER_COUNT"
+
+data_freshness_body="$(curl_body data_freshness "${API_BASE_URL}/api/data-freshness" 200)"
+assert_json "$data_freshness_body" "data freshness API should return JSON"
+print_json_summary "data freshness API" "$data_freshness_body"
+assert_data_freshness_contract "$data_freshness_body" "$SMOKE_MIN_TOTAL_COUNT"
 
 admin_denied="$(curl_body admin_dashboard_denied "${API_BASE_URL}/api/admin/dashboard" 403)"
 assert_contains "$admin_denied" "Invalid admin token\\|Forbidden\\|403" "Admin dashboard should reject missing token"
