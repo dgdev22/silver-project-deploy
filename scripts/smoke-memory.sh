@@ -15,6 +15,8 @@ API_BASE_URL="${SILVER_API_BASE_URL:-$BASE_URL}"
 MEMORY_APP_URL="${MEMORY_APP_URL%/}"
 API_BASE_URL="${API_BASE_URL%/}"
 MEMORY_SLUG="${SILVER_MEMORY_SLUG:-kim-youngsu}"
+MEMORY_SMOKE_RETRIES="${SILVER_MEMORY_SMOKE_RETRIES:-6}"
+MEMORY_SMOKE_RETRY_SLEEP_SECONDS="${SILVER_MEMORY_SMOKE_RETRY_SLEEP_SECONDS:-2}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -32,18 +34,26 @@ curl_body() {
   local expected_status="$3"
   local output="$TMP_DIR/${name}.body"
   local status
+  local attempt
 
   : > "$output"
-  status="$(curl -sS -L -o "$output" -w "%{http_code}" "$url")"
+  for attempt in $(seq 1 "$MEMORY_SMOKE_RETRIES"); do
+    status="$(curl -sS -L -o "$output" -w "%{http_code}" "$url" || printf '000')"
 
-  if [ "$status" != "$expected_status" ]; then
-    echo "FAIL $name: expected HTTP $expected_status but got $status" >&2
-    echo "URL: $url" >&2
-    sed -n '1,40p' "$output" >&2
-    exit 1
-  fi
+    if [ "$status" = "$expected_status" ]; then
+      echo "$output"
+      return
+    fi
 
-  echo "$output"
+    if [ "$attempt" -lt "$MEMORY_SMOKE_RETRIES" ]; then
+      sleep "$MEMORY_SMOKE_RETRY_SLEEP_SECONDS"
+    fi
+  done
+
+  echo "FAIL $name: expected HTTP $expected_status but got $status" >&2
+  echo "URL: $url" >&2
+  sed -n '1,40p' "$output" >&2
+  exit 1
 }
 
 curl_editor_body() {
@@ -52,22 +62,30 @@ curl_editor_body() {
   local expected_status="$3"
   local output="$TMP_DIR/${name}.body"
   local status
+  local attempt
 
   : > "$output"
-  status="$(curl -sS -L \
-    -H "X-Memory-Editor-Token: ${MEMORY_EDITOR_TOKEN:-}" \
-    -o "$output" \
-    -w "%{http_code}" \
-    "$url")"
+  for attempt in $(seq 1 "$MEMORY_SMOKE_RETRIES"); do
+    status="$(curl -sS -L \
+      -H "X-Memory-Editor-Token: ${MEMORY_EDITOR_TOKEN:-}" \
+      -o "$output" \
+      -w "%{http_code}" \
+      "$url" || printf '000')"
 
-  if [ "$status" != "$expected_status" ]; then
-    echo "FAIL $name: expected HTTP $expected_status but got $status" >&2
-    echo "URL: $url" >&2
-    sed -n '1,80p' "$output" >&2
-    exit 1
-  fi
+    if [ "$status" = "$expected_status" ]; then
+      echo "$output"
+      return
+    fi
 
-  echo "$output"
+    if [ "$attempt" -lt "$MEMORY_SMOKE_RETRIES" ]; then
+      sleep "$MEMORY_SMOKE_RETRY_SLEEP_SECONDS"
+    fi
+  done
+
+  echo "FAIL $name: expected HTTP $expected_status but got $status" >&2
+  echo "URL: $url" >&2
+  sed -n '1,80p' "$output" >&2
+  exit 1
 }
 
 assert_contains() {
@@ -243,6 +261,105 @@ delete_json() {
   echo "$output"
 }
 
+post_upload() {
+  local name="$1"
+  local url="$2"
+  local expected_status="$3"
+  local file="$4"
+  local output="$TMP_DIR/${name}.body"
+  local status
+
+  : > "$output"
+  status="$(curl -sS -L \
+    -H "X-Memory-Editor-Token: ${MEMORY_EDITOR_TOKEN:-}" \
+    -o "$output" \
+    -w "%{http_code}" \
+    -X POST \
+    -F "file=@${file};type=image/png" \
+    "$url")"
+
+  if [ "$status" != "$expected_status" ]; then
+    echo "FAIL $name: expected HTTP $expected_status but got $status" >&2
+    echo "URL: $url" >&2
+    sed -n '1,80p' "$output" >&2
+    exit 1
+  fi
+
+  echo "$output"
+}
+
+download_file() {
+  local name="$1"
+  local url="$2"
+  local expected_status="$3"
+  local output="$TMP_DIR/${name}.body"
+  local status
+  local attempt
+
+  : > "$output"
+  for attempt in $(seq 1 "$MEMORY_SMOKE_RETRIES"); do
+    status="$(curl -sS -L -o "$output" -w "%{http_code}" "$url" || printf '000')"
+
+    if [ "$status" = "$expected_status" ]; then
+      if [ ! -s "$output" ]; then
+        echo "FAIL $name: downloaded file is empty" >&2
+        echo "URL: $url" >&2
+        exit 1
+      fi
+
+      echo "$output"
+      return
+    fi
+
+    if [ "$attempt" -lt "$MEMORY_SMOKE_RETRIES" ]; then
+      sleep "$MEMORY_SMOKE_RETRY_SLEEP_SECONDS"
+    fi
+  done
+
+  echo "FAIL $name: expected HTTP $expected_status but got $status" >&2
+  echo "URL: $url" >&2
+  exit 1
+}
+
+create_smoke_png() {
+  local output="$1"
+  local png_base64="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+
+  if printf '%s' "$png_base64" | base64 --decode > "$output" 2>/dev/null; then
+    return
+  fi
+
+  printf '%s' "$png_base64" | base64 -D > "$output"
+}
+
+absolute_url() {
+  local path="$1"
+
+  case "$path" in
+    http://*|https://*)
+      printf '%s\n' "$path"
+      ;;
+    /*)
+      printf '%s\n' "${API_BASE_URL}${path}"
+      ;;
+    *)
+      printf '%s\n' "${API_BASE_URL}/${path}"
+      ;;
+  esac
+}
+
+assert_png_signature() {
+  local file="$1"
+  local signature
+
+  signature="$(head -c 8 "$file" | base64 | tr -d '\n')"
+
+  if [ "$signature" != "iVBORw0KGgo=" ]; then
+    echo "FAIL: uploaded image should be served as PNG content" >&2
+    exit 1
+  fi
+}
+
 require_command curl
 require_command grep
 require_command python3
@@ -251,6 +368,7 @@ echo "Silver Memory smoke test"
 echo "Memory app: $MEMORY_APP_URL"
 echo "API base:   $API_BASE_URL"
 echo "Slug:       $MEMORY_SLUG"
+echo "Retries:    $MEMORY_SMOKE_RETRIES"
 
 frontend_body="$(curl_body memory_frontend "${MEMORY_APP_URL}/" 200)"
 assert_contains "$frontend_body" "Silver Memory" "Memory frontend HTML should include Silver Memory"
@@ -270,20 +388,50 @@ moderation_denied="$(curl_body memory_moderation_denied "${API_BASE_URL}/api/mem
 assert_contains "$moderation_denied" "Invalid memory editor token\\|Forbidden\\|403" "Moderation API should reject missing editor token"
 echo "PASS editor protection"
 
-if [ "${SILVER_MEMORY_SMOKE_WRITE:-0}" != "1" ]; then
-  echo "SKIP write checks. Set SILVER_MEMORY_SMOKE_WRITE=1 and MEMORY_EDITOR_TOKEN to test moderation writes."
+if [ "${SILVER_MEMORY_SMOKE_WRITE:-0}" != "1" ] && [ "${SILVER_MEMORY_SMOKE_UPLOAD:-0}" != "1" ]; then
+  echo "SKIP write/upload checks. Set SILVER_MEMORY_SMOKE_WRITE=1 for content writes or SILVER_MEMORY_SMOKE_UPLOAD=1 for image upload verification."
   echo "Memory smoke test complete."
   exit 0
 fi
 
 if [ -z "${MEMORY_EDITOR_TOKEN:-}" ]; then
-  echo "SILVER_MEMORY_SMOKE_WRITE=1 requires MEMORY_EDITOR_TOKEN." >&2
+  echo "SILVER_MEMORY_SMOKE_WRITE=1 or SILVER_MEMORY_SMOKE_UPLOAD=1 requires MEMORY_EDITOR_TOKEN." >&2
   exit 1
 fi
 
 moderation_body="$(curl_editor_body memory_moderation_allowed "${API_BASE_URL}/api/memory/memorials/${MEMORY_SLUG}?includeModeration=true" 200)"
 assert_contains "$moderation_body" "\"editHistory\"" "Moderation API should include editHistory"
 echo "PASS moderation API"
+
+if [ "${SILVER_MEMORY_SMOKE_UPLOAD:-0}" = "1" ]; then
+  require_command base64
+
+  smoke_png="$TMP_DIR/memory-smoke.png"
+  create_smoke_png "$smoke_png"
+
+  upload_body="$(post_upload memory_upload "${API_BASE_URL}/api/memory/memorials/${MEMORY_SLUG}/uploads" 201 "$smoke_png")"
+  assert_contains "$upload_body" "\"contentType\":\"image/png\"" "Upload response should preserve image/png content type"
+
+  upload_url="$(sed -n 's/.*"url":"\([^"]*\)".*/\1/p' "$upload_body" | head -n 1)"
+
+  if [ -z "$upload_url" ]; then
+    echo "FAIL: Could not find upload url in response" >&2
+    sed -n '1,80p' "$upload_body" >&2
+    exit 1
+  fi
+
+  uploaded_file_body="$(download_file memory_upload_file "$(absolute_url "$upload_url")" 200)"
+  assert_png_signature "$uploaded_file_body"
+  echo "PASS image upload/retrieval"
+else
+  echo "SKIP upload check. Set SILVER_MEMORY_SMOKE_UPLOAD=1 to upload a tiny PNG and verify /uploads/memory."
+fi
+
+if [ "${SILVER_MEMORY_SMOKE_WRITE:-0}" != "1" ]; then
+  echo "SKIP content write checks. Set SILVER_MEMORY_SMOKE_WRITE=1 to test guestbook, timeline, moments, and announcements."
+  echo "Memory smoke test complete."
+  exit 0
+fi
 
 timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
 guestbook_body="$(post_json memory_guestbook "${API_BASE_URL}/api/memory/memorials/${MEMORY_SLUG}/guestbook" 201 "{\"author\":\"Smoke Test\",\"relation\":\"운영 점검\",\"message\":\"운영 점검 메시지 ${timestamp}\"}")"

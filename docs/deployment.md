@@ -234,7 +234,16 @@ cd ~/apps/silverProject/deploy
 ./scripts/smoke-memory.sh https://silver.loopmateapp.com
 ```
 
-기본 smoke test는 읽기 전용이다. 방명록 moderation과 타임라인/기억 카드/공지사항 쓰기까지 확인할 때만 아래처럼 실행한다.
+기본 smoke test는 읽기 전용이다. 대표사진 업로드 경로를 확인하려면 tiny PNG를 업로드한 뒤 `/uploads/memory/...` 다운로드 응답까지 확인한다. 업로드 파일은 운영 볼륨에 남으므로 필요할 때만 수동 실행한다.
+
+```bash
+cd ~/apps/silverProject/deploy
+SILVER_MEMORY_SMOKE_UPLOAD=1 \
+MEMORY_EDITOR_TOKEN='유족_코드' \
+./scripts/smoke-memory.sh https://silver.loopmateapp.com
+```
+
+방명록 moderation과 타임라인/기억 카드/공지사항 쓰기까지 확인할 때만 아래처럼 실행한다.
 
 ```bash
 cd ~/apps/silverProject/deploy

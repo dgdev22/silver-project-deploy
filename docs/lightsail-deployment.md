@@ -273,6 +273,15 @@ cd ~/apps/silverProject/deploy
 ./scripts/smoke-memory.sh https://silver.loopmateapp.com
 ```
 
+대표사진 업로드 경로까지 확인하려면 tiny PNG를 업로드한 뒤 `/uploads/memory/...` 다운로드 응답을 확인한다. 업로드 파일은 운영 볼륨에 남으므로 필요할 때만 수동 실행한다.
+
+```bash
+cd ~/apps/silverProject/deploy
+SILVER_MEMORY_SMOKE_UPLOAD=1 \
+MEMORY_EDITOR_TOKEN='유족_코드' \
+./scripts/smoke-memory.sh https://silver.loopmateapp.com
+```
+
 유족 코드와 방명록 moderation까지 확인하려면:
 
 ```bash
@@ -282,7 +291,7 @@ MEMORY_EDITOR_TOKEN='유족_코드' \
 ./scripts/smoke-memory.sh https://silver.loopmateapp.com
 ```
 
-쓰기 점검은 점검용 방명록을 생성한 뒤 바로 `hidden`으로 바꾼다.
+쓰기 점검은 점검용 방명록을 생성한 뒤 바로 `hidden`으로 바꾸고, 타임라인/기억 카드/공지사항 점검 레코드는 삭제한다.
 
 ## 12. 백업
 

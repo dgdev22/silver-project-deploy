@@ -84,6 +84,16 @@ Silver Memory 배포 후 읽기 전용 점검. 프론트 HTML, JS/CSS 정적 자
 ./scripts/smoke-memory.sh https://silver.loopmateapp.com
 ```
 
+배포 직후 일시적인 재기동 구간을 견디도록 읽기 요청은 기본 6회 재시도합니다. 필요하면 `SILVER_MEMORY_SMOKE_RETRIES`, `SILVER_MEMORY_SMOKE_RETRY_SLEEP_SECONDS`로 조정합니다.
+
+유족 코드와 함께 이미지 업로드 경로까지 점검하려면 tiny PNG를 업로드한 뒤 `/uploads/memory/...` 다운로드 응답을 확인합니다. 이 점검은 운영 DB/볼륨에 작은 파일을 남기므로 필요할 때만 수동으로 실행합니다.
+
+```bash
+SILVER_MEMORY_SMOKE_UPLOAD=1 \
+MEMORY_EDITOR_TOKEN='유족_코드' \
+./scripts/smoke-memory.sh https://silver.loopmateapp.com
+```
+
 유족 코드까지 포함한 쓰기 점검은 운영 DB에 점검용 방명록, 타임라인, 기억 카드, 공지사항을 만든 뒤 바로 숨김 또는 삭제 처리합니다.
 
 ```bash
