@@ -41,6 +41,8 @@ Silver Memory 운영 백오피스는 `/memory/#/admin`에서 열고, `.env.prod`
 SILVER_DEPLOY_SMOKE=1 ./scripts/deploy-app.sh
 ```
 
+`scripts/deploy-app.sh`는 컨테이너를 빌드하거나 재기동하기 전에 `scripts/validate-deploy-config.sh`를 실행합니다. 긴급 복구처럼 검증을 의도적으로 건너뛰어야 할 때만 `SILVER_SKIP_DEPLOY_VALIDATE=1`을 사용합니다.
+
 배포 파일을 수정한 뒤에는 먼저 shell script 문법과 Docker Compose 설정을 점검합니다. Docker Compose가 없는 로컬 환경에서는 compose 검사를 자동으로 건너뜁니다.
 
 ```bash

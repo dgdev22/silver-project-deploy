@@ -36,6 +36,10 @@ if [ -d deploy/silver-memory-app ]; then
   cp -R deploy/silver-memory-app/. silver-memory-app/
 fi
 
+if [ "${SILVER_SKIP_DEPLOY_VALIDATE:-0}" != "1" ]; then
+  bash deploy/scripts/validate-deploy-config.sh
+fi
+
 pull_repo silver-data-collector
 pull_repo backend
 pull_repo silver-tour-app
