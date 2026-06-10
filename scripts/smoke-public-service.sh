@@ -198,6 +198,19 @@ assert_contest_static_meta() {
   echo "PASS $label static metadata"
 }
 
+assert_static_meta() {
+  local label="$1"
+  local file="$2"
+  local expected_title="$3"
+  local expected_url="$4"
+
+  assert_contains "$file" "<title>${expected_title}</title>" "$label should include static title before JavaScript runs"
+  assert_contains "$file" "property=\"og:title\"" "$label should include Open Graph title"
+  assert_contains "$file" "property=\"og:url\" content=\"${expected_url}\"" "$label should include canonical Open Graph URL"
+  assert_contains "$file" "$expected_title" "$label should include title text"
+  echo "PASS $label static metadata"
+}
+
 assert_internal_route_protected() {
   local label="$1"
   local base_url="$2"
@@ -605,7 +618,7 @@ echo "Min layers: $SMOKE_MIN_LAYER_COUNT"
 echo "Allowed freshness statuses: $SMOKE_ALLOWED_FRESHNESS_STATUSES"
 echo "Max data age hours: $SMOKE_MAX_DATA_AGE_HOURS"
 
-for path in "/" "/learning" "/contest" "/tour" "/contest/tour" "/mobility" "/health" "/contest/education" "/contest/food" "/contest/mobility"; do
+for path in "/" "/course" "/learning" "/contest" "/tour" "/contest/tour" "/mobility" "/health" "/contest/education" "/contest/food" "/contest/mobility"; do
   page_name="$(smoke_name_from_path "$path")"
   body="$(curl_body "page_${page_name}" "${BASE_URL}${path}" 200)"
   assert_contains "$body" "root\\|Silver\\|script" "Page $path should look like app HTML"
@@ -615,6 +628,7 @@ done
 
 home_body="$(curl_body home_static_links "${BASE_URL}/" 200)"
 assert_contains "$home_body" "/contest" "home page should include contest hub link in static HTML"
+assert_contains "$home_body" "/course" "home page should include daily course link in static HTML"
 
 assert_internal_route_protected "frontend" "$BASE_URL"
 
@@ -656,6 +670,13 @@ assert_contest_static_meta \
   "$contest_mobility_body" \
   "Silver Smile 공모전 제출용 | 2026 국토·교통 데이터 활용 경진대회"
 
+course_body="$(curl_body course_static_meta "${BASE_URL}/course" 200)"
+assert_static_meta \
+  "daily course page" \
+  "$course_body" \
+  "Silver Smile 하루 안심 코스 | 공공데이터 어르신 맞춤 외출" \
+  "${BASE_URL}/course"
+
 robots_body="$(curl_body robots_txt "${BASE_URL}/robots.txt" 200)"
 assert_contains "$robots_body" "Sitemap:.*sitemap.xml" "robots.txt should point to sitemap.xml"
 echo "PASS robots.txt"
@@ -664,6 +685,7 @@ sitemap_body="$(curl_body sitemap_xml "${BASE_URL}/sitemap.xml" 200)"
 assert_sitemap_routes \
   "$sitemap_body" \
   "/" \
+  "/course" \
   "/learning" \
   "/contest" \
   "/tour" \

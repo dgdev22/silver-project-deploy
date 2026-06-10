@@ -64,7 +64,7 @@ cat ~/.ssh/github_actions_silver_deploy
 
 - `.github/workflows/deploy.yml`: main push 또는 수동 실행 시 코드 배포. 수동 실행은 `run_smoke=true`가 기본값이다.
 - `.github/workflows/refresh-data.yml`: 수동 실행 시 공공데이터 재수집/import. 기본 입력은 `mode=education`, `regions=강릉`, `limit=20`
-- `.github/workflows/public-smoke.yml`: 매일 06:30 KST 공개 URL, 공모전 제출 허브, 지도 API, 데이터 신선도 smoke.
+- `.github/workflows/public-smoke.yml`: 매일 06:30 KST 공개 URL, 하루 안심 코스, 공모전 제출 허브, 지도 API, 데이터 신선도 smoke.
 - `.github/workflows/operations-smoke.yml`: 매일 08:00 KST Lightsail에서 public/internal/Memory/백업 신선도 smoke.
 
 다른 repository도 main push마다 자동 배포하려면 같은 `deploy.yml`을 추가한다.
