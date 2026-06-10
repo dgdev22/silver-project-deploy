@@ -206,6 +206,8 @@ cd ~/apps/silverProject/deploy
 SILVER_REFRESH_MODE=full SILVER_REFRESH_REGIONS="강릉" SILVER_REFRESH_LIMIT=5 ./scripts/refresh-data.sh
 ```
 
+`refresh-data.sh`는 collector 이미지를 기본 재빌드한 뒤 수집한다. 최신 collector 코드를 pull한 직후 오래된 이미지로 수집하는 일을 막기 위한 동작이다. 긴급히 기존 이미지를 그대로 써야 할 때만 `SILVER_REFRESH_BUILD_COLLECTOR=0`을 함께 지정한다.
+
 강릉 외 지역을 바로 추가하려면:
 
 ```bash

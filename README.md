@@ -29,6 +29,8 @@ Silver Memory 운영 백오피스는 `/memory/#/admin`에서 열고, `.env.prod`
 
 `scripts/refresh-data.sh`는 cron, 수동 workflow, 서버 직접 실행이 겹쳐도 한 번에 하나만 실행되도록 `/tmp/silver-data-refresh.lock`을 사용합니다. 필요하면 `SILVER_REFRESH_LOCK_FILE`, `SILVER_REFRESH_LOCK_WAIT_SECONDS`로 조정합니다.
 
+데이터 갱신 전에는 기본적으로 collector 이미지를 다시 빌드합니다. GitHub Actions나 서버에서 최신 collector 코드를 pull한 뒤 stale image로 수집하는 일을 막기 위한 동작이며, 긴급하게 기존 이미지를 그대로 써야 할 때만 `SILVER_REFRESH_BUILD_COLLECTOR=0`으로 끕니다.
+
 데이터 갱신 mode는 `education`, `core`, `food`, `full`만 허용합니다. `SILVER_REFRESH_LIMIT`은 양의 정수, `SILVER_MFDS_PAUSE_SECONDS`는 0 이상의 정수여야 합니다. GitHub Actions 수동 갱신 workflow도 같은 입력 검증 후 shell-safe quoting으로 서버에 값을 전달합니다.
 
 `scripts/backup-postgres.sh`는 운영 PostgreSQL을 custom-format dump로 백업합니다. `scripts/backup-volumes.sh`는 Memory 업로드와 collector 데이터 Docker volume을 `tar.gz`로 백업합니다. `scripts/install-cron.sh`를 실행하면 매일 02:30 KST DB 백업, 02:40 KST volume 백업 cron도 함께 설치됩니다. 복원 절차는 `docs/backup-restore.md`를 따릅니다.

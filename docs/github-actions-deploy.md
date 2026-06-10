@@ -130,6 +130,8 @@ cd ~/apps/silverProject/deploy
 ./scripts/refresh-data.sh
 ```
 
+`refresh-data.sh`는 실행 전에 collector 이미지를 기본 재빌드한다. 최신 collector 코드를 pull한 뒤 stale image로 수집하지 않기 위한 동작이며, 긴급히 기존 이미지를 그대로 쓸 때만 `SILVER_REFRESH_BUILD_COLLECTOR=0`을 함께 지정한다.
+
 Silver Memory 배포 확인:
 
 ```bash

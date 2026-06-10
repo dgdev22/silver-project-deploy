@@ -10,6 +10,7 @@ MODE="${SILVER_REFRESH_MODE:-full}"
 MFDS_PAUSE_SECONDS="${SILVER_MFDS_PAUSE_SECONDS:-30}"
 LOCK_FILE="${SILVER_REFRESH_LOCK_FILE:-/tmp/silver-data-refresh.lock}"
 LOCK_WAIT_SECONDS="${SILVER_REFRESH_LOCK_WAIT_SECONDS:-900}"
+BUILD_COLLECTOR="${SILVER_REFRESH_BUILD_COLLECTOR:-1}"
 
 validate_positive_integer() {
   local label="$1"
@@ -54,6 +55,15 @@ validate_inputs() {
   validate_positive_integer "SILVER_REFRESH_LIMIT" "$LIMIT"
   validate_non_negative_integer "SILVER_MFDS_PAUSE_SECONDS" "$MFDS_PAUSE_SECONDS"
   validate_positive_integer "SILVER_REFRESH_LOCK_WAIT_SECONDS" "$LOCK_WAIT_SECONDS"
+
+  case "$BUILD_COLLECTOR" in
+    0|1)
+      ;;
+    *)
+      echo "SILVER_REFRESH_BUILD_COLLECTOR must be 0 or 1: $BUILD_COLLECTOR" >&2
+      exit 1
+      ;;
+  esac
 }
 
 validate_inputs
@@ -72,6 +82,13 @@ cd "$APP_DIR"
 if [ ! -f "$ENV_FILE" ]; then
   echo "Missing $APP_DIR/$ENV_FILE" >&2
   exit 1
+fi
+
+if [ "$BUILD_COLLECTOR" = "1" ]; then
+  echo "Building collector image before refresh"
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build collector
+else
+  echo "Skipping collector image build. SILVER_REFRESH_BUILD_COLLECTOR=0"
 fi
 
 run_collector() {
@@ -150,4 +167,4 @@ esac
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T backend \
   sh -c 'wget -qO- --header="X-Silver-Admin-Token: ${SILVER_ADMIN_TOKEN}" --post-data="" "http://localhost:8080/internal/import/processed-json?directory=/data/processed"'
 
-echo "Data refresh complete. mode=$MODE regions=$REGIONS limit=$LIMIT"
+echo "Data refresh complete. mode=$MODE regions=$REGIONS limit=$LIMIT buildCollector=$BUILD_COLLECTOR"
