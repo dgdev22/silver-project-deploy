@@ -78,7 +78,7 @@ SILVER_ADMIN_TOKEN='관리자_토큰' \
 ./scripts/smoke-after-deploy.sh
 ```
 
-Silver Memory 배포 후 읽기 전용 점검. 프론트 HTML, 공개 API, `announcements` 응답 계약, 유족 보호 상태를 확인합니다.
+Silver Memory 배포 후 읽기 전용 점검. 프론트 HTML, JS/CSS 정적 자산, 공개 API, `announcements` 응답 계약, 유족 보호 상태를 확인합니다.
 
 ```bash
 ./scripts/smoke-memory.sh https://silver.loopmateapp.com

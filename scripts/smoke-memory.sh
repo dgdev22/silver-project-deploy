@@ -82,6 +82,83 @@ assert_contains() {
   fi
 }
 
+assert_html_assets_reachable() {
+  local label="$1"
+  local file="$2"
+  local base_url="$3"
+  local urls_file="$TMP_DIR/${label}_assets.urls"
+  local asset_url
+  local count=0
+
+  python3 - "$file" "$base_url" > "$urls_file" <<'PY'
+import sys
+from html.parser import HTMLParser
+from urllib.parse import urljoin, urlparse
+
+path = sys.argv[1]
+base_url = sys.argv[2]
+base_origin = urlparse(base_url)
+asset_urls = []
+
+
+class AssetParser(HTMLParser):
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+
+        if tag == "script" and attributes.get("src"):
+            asset_urls.append(attributes["src"])
+            return
+
+        if tag != "link" or not attributes.get("href"):
+            return
+
+        rel = set((attributes.get("rel") or "").lower().split())
+        if rel & {
+            "stylesheet",
+            "preload",
+            "modulepreload",
+            "icon",
+            "apple-touch-icon",
+            "manifest",
+        }:
+            asset_urls.append(attributes["href"])
+
+
+with open(path, encoding="utf-8", errors="replace") as handle:
+    parser = AssetParser()
+    parser.feed(handle.read())
+
+seen = set()
+for value in asset_urls:
+    parsed_value = urlparse(value)
+    if parsed_value.scheme in {"data", "mailto", "tel"}:
+        continue
+
+    url = urljoin(base_url + "/", value)
+    parsed_url = urlparse(url)
+    if (parsed_url.scheme, parsed_url.netloc) != (base_origin.scheme, base_origin.netloc):
+        continue
+
+    if url not in seen:
+        seen.add(url)
+        print(url)
+PY
+
+  while IFS= read -r asset_url; do
+    [ -n "$asset_url" ] || continue
+    count=$((count + 1))
+    curl_body "${label}_asset_${count}" "$asset_url" 200 >/dev/null
+  done < "$urls_file"
+
+  if [ "$count" -eq 0 ]; then
+    echo "FAIL $label: no static assets found in page HTML" >&2
+    sed -n '1,80p' "$file" >&2
+    exit 1
+  fi
+
+  echo "PASS $label static assets: $count reachable"
+}
+
 post_json() {
   local name="$1"
   local url="$2"
@@ -168,6 +245,7 @@ delete_json() {
 
 require_command curl
 require_command grep
+require_command python3
 
 echo "Silver Memory smoke test"
 echo "Memory app: $MEMORY_APP_URL"
@@ -177,6 +255,7 @@ echo "Slug:       $MEMORY_SLUG"
 frontend_body="$(curl_body memory_frontend "${MEMORY_APP_URL}/" 200)"
 assert_contains "$frontend_body" "Silver Memory" "Memory frontend HTML should include Silver Memory"
 assert_contains "$frontend_body" "src/main.js" "Memory frontend should load src/main.js"
+assert_html_assets_reachable memory_frontend "$frontend_body" "$MEMORY_APP_URL"
 echo "PASS frontend"
 
 public_body="$(curl_body memory_public "${API_BASE_URL}/api/memory/memorials/${MEMORY_SLUG}" 200)"
