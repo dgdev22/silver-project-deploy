@@ -543,6 +543,10 @@ assert_contest_static_meta \
   "contest index page" \
   "$contest_index_body" \
   "Silver Smile 공모전 제출 허브 | 공공데이터 어르신 맞춤 지역정보"
+assert_contains "$contest_index_body" "/contest/education" "contest index should include education submission link in static HTML"
+assert_contains "$contest_index_body" "/contest/tour" "contest index should include tourism submission link in static HTML"
+assert_contains "$contest_index_body" "/contest/mobility" "contest index should include mobility submission link in static HTML"
+assert_contains "$contest_index_body" "/contest/food" "contest index should include food submission link in static HTML"
 
 contest_tour_body="$(curl_body contest_tour_static_meta "${BASE_URL}/contest/tour" 200)"
 assert_contest_static_meta \
