@@ -526,6 +526,9 @@ for path in "/" "/learning" "/contest" "/tour" "/contest/tour" "/mobility" "/hea
   echo "PASS page $path"
 done
 
+home_body="$(curl_body home_static_links "${BASE_URL}/" 200)"
+assert_contains "$home_body" "/contest" "home page should include contest hub link in static HTML"
+
 assert_internal_route_protected "frontend" "$BASE_URL"
 
 if [ "$API_BASE_URL" != "$BASE_URL" ]; then
