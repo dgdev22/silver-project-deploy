@@ -37,6 +37,12 @@ Silver Memory 운영 백오피스는 `/memory/#/admin`에서 열고, `.env.prod`
 
 `scripts/check-backups.sh`는 최신 DB/volume 백업이 존재하고 기본 48시간 이내인지 확인합니다. `scripts/smoke-after-deploy.sh`도 이 검사를 함께 실행하며, 첫 백업 전 환경에서는 `SILVER_SKIP_BACKUP_CHECK=1`로 건너뜁니다.
 
+운영 서버의 현재 커밋, 컨테이너, 데이터 freshness, 백업, 디스크 상태를 읽기 전용으로 빠르게 보려면 아래 명령을 실행합니다. secret 값은 출력하지 않습니다.
+
+```bash
+./scripts/ops-status.sh
+```
+
 배포 후 읽기 전용 스모크 테스트까지 자동으로 돌리려면 서버에서 아래처럼 실행합니다.
 
 ```bash
