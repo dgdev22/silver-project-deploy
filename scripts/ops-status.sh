@@ -89,6 +89,65 @@ PY
   rm -f "$output"
 }
 
+summarize_collector_runs() {
+  local output
+  output="$(mktemp)"
+
+  if ! command -v docker >/dev/null 2>&1 || [ ! -f "$APP_DIR/$COMPOSE_FILE" ] || [ ! -f "$ENV_PATH" ]; then
+    echo "SKIP collector run summary. docker, $APP_DIR/$COMPOSE_FILE, or $ENV_PATH is unavailable."
+    rm -f "$output"
+    return
+  fi
+
+  if ! (
+    cd "$APP_DIR"
+    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T backend sh -c '
+      wget -qO- \
+        --header="X-Silver-Admin-Token: ${SILVER_ADMIN_TOKEN}" \
+        "http://localhost:8080/internal/collector-runs?limit=5"
+    '
+  ) > "$output"; then
+    echo "WARN collector runs API is unavailable."
+    rm -f "$output"
+    return
+  fi
+
+  python3 - "$output" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    runs = json.load(handle)
+
+if not isinstance(runs, list) or not runs:
+    print("No recent collector runs.")
+    raise SystemExit
+
+for run in runs:
+    if not isinstance(run, dict):
+        continue
+
+    print(
+        "#{id} {status} {source}/{data_type} "
+        "fetched={fetched} inserted={inserted} updated={updated} failed={failed} "
+        "started={started} finished={finished}".format(
+            id=run.get("id", "?"),
+            status=run.get("status", "unknown"),
+            source=run.get("sourceName", "unknown"),
+            data_type=run.get("dataType", "unknown"),
+            fetched=run.get("fetchedCount", "?"),
+            inserted=run.get("insertedCount", "?"),
+            updated=run.get("updatedCount", "?"),
+            failed=run.get("failedCount", "?"),
+            started=run.get("startedAt", "unknown"),
+            finished=run.get("finishedAt") or "running",
+        )
+    )
+PY
+
+  rm -f "$output"
+}
+
 echo "Silver Project operations status"
 echo "Generated at: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 echo "App dir:      $APP_DIR"
@@ -119,6 +178,9 @@ BASE_URL="${BASE_URL:-https://silver.loopmateapp.com}"
 BASE_URL="${BASE_URL%/}"
 echo "Base URL: $BASE_URL"
 summarize_data_freshness "$BASE_URL"
+
+print_section "Recent Collector Runs"
+summarize_collector_runs
 
 print_section "Backups"
 if [ -x "$DEPLOY_DIR/scripts/check-backups.sh" ]; then
