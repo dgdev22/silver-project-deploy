@@ -73,3 +73,17 @@ jobs:
           ssh -i ~/.ssh/lightsail_key \
             "$SSH_TARGET" \
             "flock -w 900 /tmp/silver-lightsail-deploy.lock bash -lc 'cd ~/apps/silverProject/deploy && git pull --ff-only && chmod +x scripts/*.sh && SILVER_DEPLOY_SMOKE=${smoke_flag} ./scripts/deploy-app.sh'"
+
+      - name: Capture operations status
+        if: always()
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          if [ -z "${SSH_TARGET:-}" ] || [ ! -f ~/.ssh/lightsail_key ]; then
+            echo "SKIP operations status. SSH is not configured."
+            exit 0
+          fi
+
+          ssh -i ~/.ssh/lightsail_key \
+            "$SSH_TARGET" \
+            "cd ~/apps/silverProject/deploy && git pull --ff-only && chmod +x scripts/*.sh && ./scripts/ops-status.sh"
