@@ -519,7 +519,7 @@ echo "Min layers: $SMOKE_MIN_LAYER_COUNT"
 echo "Allowed freshness statuses: $SMOKE_ALLOWED_FRESHNESS_STATUSES"
 echo "Max data age hours: $SMOKE_MAX_DATA_AGE_HOURS"
 
-for path in "/" "/learning" "/tour" "/contest/tour" "/mobility" "/health" "/contest/education" "/contest/food" "/contest/mobility"; do
+for path in "/" "/learning" "/contest" "/tour" "/contest/tour" "/mobility" "/health" "/contest/education" "/contest/food" "/contest/mobility"; do
   page_name="$(echo "$path" | tr '/-' '__')"
   body="$(curl_body "page_${page_name}" "${BASE_URL}${path}" 200)"
   assert_contains "$body" "root\\|Silver\\|script" "Page $path should look like app HTML"
@@ -537,6 +537,12 @@ assert_contest_static_meta \
   "contest education page" \
   "$contest_education_body" \
   "Silver Smile 공모전 제출용 | 2026 교육 공공데이터 활용대회"
+
+contest_index_body="$(curl_body contest_index_static_meta "${BASE_URL}/contest" 200)"
+assert_contest_static_meta \
+  "contest index page" \
+  "$contest_index_body" \
+  "Silver Smile 공모전 제출 허브 | 공공데이터 어르신 맞춤 지역정보"
 
 contest_tour_body="$(curl_body contest_tour_static_meta "${BASE_URL}/contest/tour" 200)"
 assert_contest_static_meta \
@@ -565,6 +571,7 @@ assert_sitemap_routes \
   "$sitemap_body" \
   "/" \
   "/learning" \
+  "/contest" \
   "/tour" \
   "/contest/tour" \
   "/mobility" \
