@@ -11,6 +11,8 @@ MFDS_PAUSE_SECONDS="${SILVER_MFDS_PAUSE_SECONDS:-30}"
 LOCK_FILE="${SILVER_REFRESH_LOCK_FILE:-/tmp/silver-data-refresh.lock}"
 LOCK_WAIT_SECONDS="${SILVER_REFRESH_LOCK_WAIT_SECONDS:-900}"
 BUILD_COLLECTOR="${SILVER_REFRESH_BUILD_COLLECTOR:-1}"
+VERIFY_CONTEST_PACKAGE="${SILVER_REFRESH_VERIFY_CONTEST_PACKAGE:-1}"
+CONTEST_MAX_FILE_AGE_HOURS="${SILVER_REFRESH_MAX_FILE_AGE_HOURS:-48}"
 
 validate_positive_integer() {
   local label="$1"
@@ -55,12 +57,22 @@ validate_inputs() {
   validate_positive_integer "SILVER_REFRESH_LIMIT" "$LIMIT"
   validate_non_negative_integer "SILVER_MFDS_PAUSE_SECONDS" "$MFDS_PAUSE_SECONDS"
   validate_positive_integer "SILVER_REFRESH_LOCK_WAIT_SECONDS" "$LOCK_WAIT_SECONDS"
+  validate_positive_integer "SILVER_REFRESH_MAX_FILE_AGE_HOURS" "$CONTEST_MAX_FILE_AGE_HOURS"
 
   case "$BUILD_COLLECTOR" in
     0|1)
       ;;
     *)
       echo "SILVER_REFRESH_BUILD_COLLECTOR must be 0 or 1: $BUILD_COLLECTOR" >&2
+      exit 1
+      ;;
+  esac
+
+  case "$VERIFY_CONTEST_PACKAGE" in
+    0|1)
+      ;;
+    *)
+      echo "SILVER_REFRESH_VERIFY_CONTEST_PACKAGE must be 0 or 1: $VERIFY_CONTEST_PACKAGE" >&2
       exit 1
       ;;
   esac
@@ -133,6 +145,32 @@ refresh_education() {
   run_collector silver-data-collector score-education-experience
 }
 
+verify_contest_package() {
+  if [ "$VERIFY_CONTEST_PACKAGE" = "0" ]; then
+    echo "Skipping contest package freshness gate. SILVER_REFRESH_VERIFY_CONTEST_PACKAGE=0"
+    return
+  fi
+
+  case "$MODE" in
+    core)
+      echo "Checking core contest package freshness (max age: ${CONTEST_MAX_FILE_AGE_HOURS}h)"
+      run_collector silver-data-collector check-contest-package \
+        --no-food-safety \
+        --max-file-age-hours "$CONTEST_MAX_FILE_AGE_HOURS" \
+        --json
+      ;;
+    full)
+      echo "Checking full contest package freshness (max age: ${CONTEST_MAX_FILE_AGE_HOURS}h)"
+      run_collector silver-data-collector check-contest-package \
+        --max-file-age-hours "$CONTEST_MAX_FILE_AGE_HOURS" \
+        --json
+      ;;
+    education|food)
+      echo "Skipping contest package freshness gate for partial refresh mode: $MODE"
+      ;;
+  esac
+}
+
 case "$MODE" in
   education)
     refresh_education
@@ -164,7 +202,9 @@ case "$MODE" in
     ;;
 esac
 
+verify_contest_package
+
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T backend \
   sh -c 'wget -qO- --header="X-Silver-Admin-Token: ${SILVER_ADMIN_TOKEN}" --post-data="" "http://localhost:8080/internal/import/processed-json?directory=/data/processed"'
 
-echo "Data refresh complete. mode=$MODE regions=$REGIONS limit=$LIMIT buildCollector=$BUILD_COLLECTOR"
+echo "Data refresh complete. mode=$MODE regions=$REGIONS limit=$LIMIT buildCollector=$BUILD_COLLECTOR verifyContestPackage=$VERIFY_CONTEST_PACKAGE"
