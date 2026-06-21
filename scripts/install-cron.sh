@@ -12,6 +12,7 @@ GANGWON_REGIONS="${SILVER_GANGWON_REFRESH_REGIONS:-강원}"
 GANGWON_CORE_LIMIT="${SILVER_GANGWON_CORE_REFRESH_LIMIT:-50}"
 FOOD_LIMIT="${SILVER_FOOD_REFRESH_LIMIT:-20}"
 MFDS_PAUSE_SECONDS="${SILVER_MFDS_PAUSE_SECONDS:-30}"
+CRON_TIMEZONE="${SILVER_CRON_TIMEZONE:-UTC}"
 
 mkdir -p "$LOG_DIR"
 
@@ -39,6 +40,27 @@ if [ "$GANGWON_CORE_REFRESH_ENABLED" = "1" ] && [ -z "${GANGWON_REGIONS//[[:spac
   exit 1
 fi
 
+case "$CRON_TIMEZONE" in
+  UTC|Etc/UTC)
+    BACKUP_POSTGRES_CRON="30 17 * * *"
+    BACKUP_VOLUMES_CRON="40 17 * * *"
+    CORE_REFRESH_CRON="0 18 * * *"
+    GANGWON_REFRESH_CRON="0 20 * * 6"
+    FOOD_REFRESH_CRON="30 19 * * 0"
+    ;;
+  Asia/Seoul)
+    BACKUP_POSTGRES_CRON="30 2 * * *"
+    BACKUP_VOLUMES_CRON="40 2 * * *"
+    CORE_REFRESH_CRON="0 3 * * *"
+    GANGWON_REFRESH_CRON="0 5 * * 0"
+    FOOD_REFRESH_CRON="30 4 * * 1"
+    ;;
+  *)
+    echo "SILVER_CRON_TIMEZONE must be UTC, Etc/UTC, or Asia/Seoul: $CRON_TIMEZONE" >&2
+    exit 1
+    ;;
+esac
+
 tmp_cron="$(mktemp)"
 crontab -l 2>/dev/null \
   | awk '
@@ -57,33 +79,34 @@ crontab -l 2>/dev/null \
 
 cat >> "$tmp_cron" <<CRON
 # BEGIN Silver Project cron
-# Silver Project: daily PostgreSQL backup before public data refresh
-30 2 * * * cd $APP_DIR/deploy && SILVER_BACKUP_RETENTION_DAYS=$BACKUP_RETENTION_DAYS ./scripts/backup-postgres.sh >> $LOG_DIR/backup-postgres.log 2>&1
+# Silver Project: cron host timezone is $CRON_TIMEZONE; schedules below target KST times
+# Silver Project: daily PostgreSQL backup at 02:30 KST before public data refresh
+$BACKUP_POSTGRES_CRON cd $APP_DIR/deploy && SILVER_BACKUP_RETENTION_DAYS=$BACKUP_RETENTION_DAYS ./scripts/backup-postgres.sh >> $LOG_DIR/backup-postgres.log 2>&1
 
-# Silver Project: daily Docker volume backup for uploads and collector data
-40 2 * * * cd $APP_DIR/deploy && SILVER_VOLUME_BACKUP_RETENTION_DAYS=$VOLUME_BACKUP_RETENTION_DAYS ./scripts/backup-volumes.sh >> $LOG_DIR/backup-volumes.log 2>&1
+# Silver Project: daily Docker volume backup at 02:40 KST for uploads and collector data
+$BACKUP_VOLUMES_CRON cd $APP_DIR/deploy && SILVER_VOLUME_BACKUP_RETENTION_DAYS=$VOLUME_BACKUP_RETENTION_DAYS ./scripts/backup-volumes.sh >> $LOG_DIR/backup-volumes.log 2>&1
 
-# Silver Project: daily public data refresh
-0 3 * * * cd $APP_DIR/deploy && SILVER_REFRESH_MODE=core SILVER_REFRESH_REGIONS="$REGIONS" SILVER_REFRESH_LIMIT=$CORE_LIMIT ./scripts/refresh-data.sh >> $LOG_DIR/refresh-core.log 2>&1
+# Silver Project: daily public data refresh at 03:00 KST
+$CORE_REFRESH_CRON cd $APP_DIR/deploy && SILVER_REFRESH_MODE=core SILVER_REFRESH_REGIONS="$REGIONS" SILVER_REFRESH_LIMIT=$CORE_LIMIT ./scripts/refresh-data.sh >> $LOG_DIR/refresh-core.log 2>&1
 
 CRON
 
 if [ "$GANGWON_CORE_REFRESH_ENABLED" = "1" ]; then
   cat >> "$tmp_cron" <<CRON
 # Silver Project: weekly Gangwon-wide core refresh for maps that present Gangwon as a region
-0 5 * * 0 cd $APP_DIR/deploy && SILVER_REFRESH_MODE=core SILVER_REFRESH_REGIONS="$GANGWON_REGIONS" SILVER_REFRESH_LIMIT=$GANGWON_CORE_LIMIT ./scripts/refresh-data.sh >> $LOG_DIR/refresh-gangwon.log 2>&1
+$GANGWON_REFRESH_CRON cd $APP_DIR/deploy && SILVER_REFRESH_MODE=core SILVER_REFRESH_REGIONS="$GANGWON_REGIONS" SILVER_REFRESH_LIMIT=$GANGWON_CORE_LIMIT ./scripts/refresh-data.sh >> $LOG_DIR/refresh-gangwon.log 2>&1
 
 CRON
 fi
 
 cat >> "$tmp_cron" <<CRON
 # Silver Project: weekly FoodSafetyKorea refresh, kept separate because MFDS can throttle shared keys
-30 4 * * 1 cd $APP_DIR/deploy && SILVER_REFRESH_MODE=food SILVER_REFRESH_REGIONS="$REGIONS" SILVER_REFRESH_LIMIT=$FOOD_LIMIT SILVER_MFDS_PAUSE_SECONDS=$MFDS_PAUSE_SECONDS ./scripts/refresh-data.sh >> $LOG_DIR/refresh-food.log 2>&1
+$FOOD_REFRESH_CRON cd $APP_DIR/deploy && SILVER_REFRESH_MODE=food SILVER_REFRESH_REGIONS="$REGIONS" SILVER_REFRESH_LIMIT=$FOOD_LIMIT SILVER_MFDS_PAUSE_SECONDS=$MFDS_PAUSE_SECONDS ./scripts/refresh-data.sh >> $LOG_DIR/refresh-food.log 2>&1
 # END Silver Project cron
 CRON
 
 crontab "$tmp_cron"
 rm -f "$tmp_cron"
 
-echo "Installed Silver Project cron jobs. gangwonCoreRefresh=$GANGWON_CORE_REFRESH_ENABLED"
+echo "Installed Silver Project cron jobs. cronTimezone=$CRON_TIMEZONE gangwonCoreRefresh=$GANGWON_CORE_REFRESH_ENABLED"
 crontab -l | grep -E "backup-postgres\\.sh|backup-volumes\\.sh|refresh-data\\.sh" || true
