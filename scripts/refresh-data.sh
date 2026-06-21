@@ -216,6 +216,7 @@ case "$MODE" in
       region="${region%"${region##*[![:space:]]}"}"
       [ -n "$region" ] && refresh_region "$region"
     done
+    run_collector silver-data-collector score-places
     run_collector silver-data-collector score-education-experience
     run_collector silver-data-collector score-contest-menus
     ;;
@@ -231,6 +232,7 @@ case "$MODE" in
       [ -n "$region" ] && refresh_region "$region"
     done
     refresh_food_safety
+    run_collector silver-data-collector score-places
     run_collector silver-data-collector score-education-experience
     run_collector silver-data-collector score-contest-menus
     ;;

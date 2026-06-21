@@ -68,15 +68,23 @@ line_number() {
 }
 
 run_refresh core
+place_score='compose --env-file .env.prod -f compose.prod.yaml run --rm collector silver-data-collector score-places'
 core_gate='compose --env-file .env.prod -f compose.prod.yaml run --rm collector silver-data-collector check-contest-package --no-food-safety --max-file-age-hours 48 --json'
 core_region_gate='compose --env-file .env.prod -f compose.prod.yaml run --rm collector silver-data-collector check-contest-region --region 강릉 --json'
 backend_import='compose --env-file .env.prod -f compose.prod.yaml exec -T backend sh -c wget -qO- --header="X-Silver-Admin-Token: ${SILVER_ADMIN_TOKEN}" --post-data="" "http://localhost:8080/internal/import/processed-json?directory=/data/processed"'
+assert_contains "$place_score"
 assert_contains "$core_gate"
 assert_contains "$core_region_gate"
 assert_contains "$backend_import"
 
 if [ "$(line_number "$core_gate")" -ge "$(line_number "$backend_import")" ]; then
   echo "Contest package gate must run before backend import." >&2
+  cat "$DOCKER_LOG" >&2
+  exit 1
+fi
+
+if [ "$(line_number "$place_score")" -ge "$(line_number "$core_gate")" ]; then
+  echo "Overall place scoring must run before the contest package gate." >&2
   cat "$DOCKER_LOG" >&2
   exit 1
 fi
@@ -89,12 +97,14 @@ fi
 
 run_refresh full
 full_gate='compose --env-file .env.prod -f compose.prod.yaml run --rm collector silver-data-collector check-contest-package --max-file-age-hours 48 --json'
+assert_contains "$place_score"
 assert_contains "$full_gate"
 assert_contains "$core_region_gate"
 assert_not_contains 'check-contest-package --no-food-safety'
 
 run_refresh food
 assert_not_contains 'check-contest-package'
+assert_not_contains 'silver-data-collector score-places'
 assert_contains "$backend_import"
 
 run_refresh core 0 0
