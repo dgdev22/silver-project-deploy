@@ -12,6 +12,7 @@ LOCK_FILE="${SILVER_REFRESH_LOCK_FILE:-/tmp/silver-data-refresh.lock}"
 LOCK_WAIT_SECONDS="${SILVER_REFRESH_LOCK_WAIT_SECONDS:-900}"
 BUILD_COLLECTOR="${SILVER_REFRESH_BUILD_COLLECTOR:-1}"
 VERIFY_CONTEST_PACKAGE="${SILVER_REFRESH_VERIFY_CONTEST_PACKAGE:-1}"
+VERIFY_CONTEST_REGION_COVERAGE="${SILVER_REFRESH_VERIFY_CONTEST_REGION_COVERAGE:-1}"
 CONTEST_MAX_FILE_AGE_HOURS="${SILVER_REFRESH_MAX_FILE_AGE_HOURS:-48}"
 
 validate_positive_integer() {
@@ -73,6 +74,15 @@ validate_inputs() {
       ;;
     *)
       echo "SILVER_REFRESH_VERIFY_CONTEST_PACKAGE must be 0 or 1: $VERIFY_CONTEST_PACKAGE" >&2
+      exit 1
+      ;;
+  esac
+
+  case "$VERIFY_CONTEST_REGION_COVERAGE" in
+    0|1)
+      ;;
+    *)
+      echo "SILVER_REFRESH_VERIFY_CONTEST_REGION_COVERAGE must be 0 or 1: $VERIFY_CONTEST_REGION_COVERAGE" >&2
       exit 1
       ;;
   esac
@@ -171,6 +181,30 @@ verify_contest_package() {
   esac
 }
 
+verify_contest_region_coverage() {
+  if [ "$VERIFY_CONTEST_REGION_COVERAGE" = "0" ]; then
+    echo "Skipping contest region coverage gate. SILVER_REFRESH_VERIFY_CONTEST_REGION_COVERAGE=0"
+    return
+  fi
+
+  case "$MODE" in
+    core|full)
+      IFS="," read -ra region_list <<< "$REGIONS"
+      for region in "${region_list[@]}"; do
+        region="${region#"${region%%[![:space:]]*}"}"
+        region="${region%"${region##*[![:space:]]}"}"
+        if [ -n "$region" ]; then
+          echo "Checking contest region coverage: $region"
+          run_collector silver-data-collector check-contest-region --region "$region" --json
+        fi
+      done
+      ;;
+    education|food)
+      echo "Skipping contest region coverage gate for partial refresh mode: $MODE"
+      ;;
+  esac
+}
+
 case "$MODE" in
   education)
     refresh_education
@@ -203,8 +237,9 @@ case "$MODE" in
 esac
 
 verify_contest_package
+verify_contest_region_coverage
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T backend \
   sh -c 'wget -qO- --header="X-Silver-Admin-Token: ${SILVER_ADMIN_TOKEN}" --post-data="" "http://localhost:8080/internal/import/processed-json?directory=/data/processed"'
 
-echo "Data refresh complete. mode=$MODE regions=$REGIONS limit=$LIMIT buildCollector=$BUILD_COLLECTOR verifyContestPackage=$VERIFY_CONTEST_PACKAGE"
+echo "Data refresh complete. mode=$MODE regions=$REGIONS limit=$LIMIT buildCollector=$BUILD_COLLECTOR verifyContestPackage=$VERIFY_CONTEST_PACKAGE verifyContestRegionCoverage=$VERIFY_CONTEST_REGION_COVERAGE"
