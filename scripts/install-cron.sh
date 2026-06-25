@@ -45,14 +45,14 @@ case "$CRON_TIMEZONE" in
     BACKUP_POSTGRES_CRON="30 17 * * *"
     BACKUP_VOLUMES_CRON="40 17 * * *"
     CORE_REFRESH_CRON="0 18 * * *"
-    GANGWON_REFRESH_CRON="0 20 * * 6"
+    GANGWON_REFRESH_CRON="0 20 * * *"
     FOOD_REFRESH_CRON="30 19 * * 0"
     ;;
   Asia/Seoul)
     BACKUP_POSTGRES_CRON="30 2 * * *"
     BACKUP_VOLUMES_CRON="40 2 * * *"
     CORE_REFRESH_CRON="0 3 * * *"
-    GANGWON_REFRESH_CRON="0 5 * * 0"
+    GANGWON_REFRESH_CRON="0 5 * * *"
     FOOD_REFRESH_CRON="30 4 * * 1"
     ;;
   *)
@@ -93,7 +93,7 @@ CRON
 
 if [ "$GANGWON_CORE_REFRESH_ENABLED" = "1" ]; then
   cat >> "$tmp_cron" <<CRON
-# Silver Project: weekly Gangwon-wide core refresh for maps that present Gangwon as a region
+# Silver Project: daily Gangwon-wide core refresh for maps that present Gangwon as a region
 $GANGWON_REFRESH_CRON cd $APP_DIR/deploy && SILVER_REFRESH_MODE=core SILVER_REFRESH_REGIONS="$GANGWON_REGIONS" SILVER_REFRESH_LIMIT=$GANGWON_CORE_LIMIT ./scripts/refresh-data.sh >> $LOG_DIR/refresh-gangwon.log 2>&1
 
 CRON

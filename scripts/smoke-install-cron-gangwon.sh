@@ -57,20 +57,20 @@ grep -Fq 'SILVER_REFRESH_REGIONS="강릉"' "$FAKE_CRONTAB" || {
   echo "Daily Gangneung refresh cron was not installed." >&2
   exit 1
 }
-grep -Fq '0 20 * * 6' "$FAKE_CRONTAB" || {
-  echo "UTC host must schedule the Sunday 05:00 KST Gangwon refresh on Saturday 20:00 UTC." >&2
+grep -Fq '0 20 * * *' "$FAKE_CRONTAB" || {
+  echo "UTC host must schedule the daily 05:00 KST Gangwon refresh at 20:00 UTC." >&2
   exit 1
 }
 grep -Fq 'SILVER_REFRESH_REGIONS="강원"' "$FAKE_CRONTAB" || {
-  echo "Weekly Gangwon refresh region was not installed." >&2
+  echo "Daily Gangwon refresh region was not installed." >&2
   exit 1
 }
 grep -Fq 'SILVER_REFRESH_LIMIT=50' "$FAKE_CRONTAB" || {
-  echo "Weekly Gangwon refresh limit was not installed." >&2
+  echo "Daily Gangwon refresh limit was not installed." >&2
   exit 1
 }
 grep -Fq 'refresh-gangwon.log' "$FAKE_CRONTAB" || {
-  echo "Weekly Gangwon refresh log was not installed." >&2
+  echo "Daily Gangwon refresh log was not installed." >&2
   exit 1
 }
 
@@ -90,8 +90,8 @@ grep -Fq '0 3 * * *' "$FAKE_CRONTAB" || {
   echo "Asia/Seoul host must keep the 03:00 KST core refresh schedule." >&2
   exit 1
 }
-grep -Fq '0 5 * * 0' "$FAKE_CRONTAB" || {
-  echo "Asia/Seoul host must keep the Sunday 05:00 KST Gangwon refresh schedule." >&2
+grep -Fq '0 5 * * *' "$FAKE_CRONTAB" || {
+  echo "Asia/Seoul host must keep the daily 05:00 KST Gangwon refresh schedule." >&2
   exit 1
 }
 
