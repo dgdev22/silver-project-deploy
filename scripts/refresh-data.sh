@@ -14,6 +14,7 @@ BUILD_COLLECTOR="${SILVER_REFRESH_BUILD_COLLECTOR:-1}"
 VERIFY_CONTEST_PACKAGE="${SILVER_REFRESH_VERIFY_CONTEST_PACKAGE:-1}"
 VERIFY_CONTEST_REGION_COVERAGE="${SILVER_REFRESH_VERIFY_CONTEST_REGION_COVERAGE:-1}"
 CONTEST_MAX_FILE_AGE_HOURS="${SILVER_REFRESH_MAX_FILE_AGE_HOURS:-48}"
+CONTEST_MIN_QUALITY="${SILVER_REFRESH_MIN_QUALITY:-30}"
 
 validate_positive_integer() {
   local label="$1"
@@ -59,6 +60,12 @@ validate_inputs() {
   validate_non_negative_integer "SILVER_MFDS_PAUSE_SECONDS" "$MFDS_PAUSE_SECONDS"
   validate_positive_integer "SILVER_REFRESH_LOCK_WAIT_SECONDS" "$LOCK_WAIT_SECONDS"
   validate_positive_integer "SILVER_REFRESH_MAX_FILE_AGE_HOURS" "$CONTEST_MAX_FILE_AGE_HOURS"
+  validate_non_negative_integer "SILVER_REFRESH_MIN_QUALITY" "$CONTEST_MIN_QUALITY"
+
+  if [ "$CONTEST_MIN_QUALITY" -gt 100 ]; then
+    echo "SILVER_REFRESH_MIN_QUALITY must be between 0 and 100: $CONTEST_MIN_QUALITY" >&2
+    exit 1
+  fi
 
   case "$BUILD_COLLECTOR" in
     0|1)
@@ -167,12 +174,14 @@ verify_contest_package() {
       run_collector silver-data-collector check-contest-package \
         --no-food-safety \
         --max-file-age-hours "$CONTEST_MAX_FILE_AGE_HOURS" \
+        --min-quality "$CONTEST_MIN_QUALITY" \
         --json
       ;;
     full)
       echo "Checking full contest package freshness (max age: ${CONTEST_MAX_FILE_AGE_HOURS}h)"
       run_collector silver-data-collector check-contest-package \
         --max-file-age-hours "$CONTEST_MAX_FILE_AGE_HOURS" \
+        --min-quality "$CONTEST_MIN_QUALITY" \
         --json
       ;;
     education|food)
@@ -244,4 +253,4 @@ verify_contest_region_coverage
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T backend \
   sh -c 'wget -qO- --header="X-Silver-Admin-Token: ${SILVER_ADMIN_TOKEN}" --post-data="" "http://localhost:8080/internal/import/processed-json?directory=/data/processed"'
 
-echo "Data refresh complete. mode=$MODE regions=$REGIONS limit=$LIMIT buildCollector=$BUILD_COLLECTOR verifyContestPackage=$VERIFY_CONTEST_PACKAGE verifyContestRegionCoverage=$VERIFY_CONTEST_REGION_COVERAGE"
+echo "Data refresh complete. mode=$MODE regions=$REGIONS limit=$LIMIT buildCollector=$BUILD_COLLECTOR verifyContestPackage=$VERIFY_CONTEST_PACKAGE verifyContestRegionCoverage=$VERIFY_CONTEST_REGION_COVERAGE minQuality=$CONTEST_MIN_QUALITY"

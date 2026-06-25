@@ -69,7 +69,7 @@ line_number() {
 
 run_refresh core
 place_score='compose --env-file .env.prod -f compose.prod.yaml run --rm collector silver-data-collector score-places'
-core_gate='compose --env-file .env.prod -f compose.prod.yaml run --rm collector silver-data-collector check-contest-package --no-food-safety --max-file-age-hours 48 --json'
+core_gate='compose --env-file .env.prod -f compose.prod.yaml run --rm collector silver-data-collector check-contest-package --no-food-safety --max-file-age-hours 48 --min-quality 30 --json'
 core_region_gate='compose --env-file .env.prod -f compose.prod.yaml run --rm collector silver-data-collector check-contest-region --region 강릉 --json'
 backend_import='compose --env-file .env.prod -f compose.prod.yaml exec -T backend sh -c wget -qO- --header="X-Silver-Admin-Token: ${SILVER_ADMIN_TOKEN}" --post-data="" "http://localhost:8080/internal/import/processed-json?directory=/data/processed"'
 assert_contains "$place_score"
@@ -96,7 +96,7 @@ if [ "$(line_number "$core_region_gate")" -ge "$(line_number "$backend_import")"
 fi
 
 run_refresh full
-full_gate='compose --env-file .env.prod -f compose.prod.yaml run --rm collector silver-data-collector check-contest-package --max-file-age-hours 48 --json'
+full_gate='compose --env-file .env.prod -f compose.prod.yaml run --rm collector silver-data-collector check-contest-package --max-file-age-hours 48 --min-quality 30 --json'
 assert_contains "$place_score"
 assert_contains "$full_gate"
 assert_contains "$core_region_gate"
@@ -129,6 +129,16 @@ if PATH="$FAKE_BIN:$PATH" \
   SILVER_REFRESH_VERIFY_CONTEST_REGION_COVERAGE=invalid \
   bash "$REFRESH_SCRIPT" >/dev/null 2>&1; then
   echo "Invalid contest region coverage verification setting must fail." >&2
+  exit 1
+fi
+
+if PATH="$FAKE_BIN:$PATH" \
+  SILVER_APP_DIR="$APP_DIR" \
+  SILVER_DOCKER_LOG="$DOCKER_LOG" \
+  SILVER_REFRESH_LOCKED=1 \
+  SILVER_REFRESH_MIN_QUALITY=101 \
+  bash "$REFRESH_SCRIPT" >/dev/null 2>&1; then
+  echo "Invalid contest package minimum quality setting must fail." >&2
   exit 1
 fi
 

@@ -45,6 +45,8 @@ EOF
     SILVER_GANGWON_CORE_REFRESH_ENABLED="$gangwon_enabled" \
     SILVER_GANGWON_REFRESH_REGIONS="강원" \
     SILVER_GANGWON_CORE_REFRESH_LIMIT=50 \
+    SILVER_CORE_REFRESH_MIN_QUALITY=25 \
+    SILVER_GANGWON_CORE_REFRESH_MIN_QUALITY=30 \
     SILVER_CRON_TIMEZONE="$cron_timezone" \
     bash "$INSTALL_SCRIPT" >/dev/null
 }
@@ -62,6 +64,10 @@ grep -Fq 'SILVER_REFRESH_REGIONS="강릉"' "$FAKE_CRONTAB" || {
   echo "Daily Gangneung refresh cron was not installed." >&2
   exit 1
 }
+grep -Fq 'SILVER_REFRESH_MIN_QUALITY=25' "$FAKE_CRONTAB" || {
+  echo "Daily Gangneung refresh minimum quality was not installed." >&2
+  exit 1
+}
 grep -Fq '0 20 * * *' "$FAKE_CRONTAB" || {
   echo "UTC host must schedule the daily 05:00 KST Gangwon refresh at 20:00 UTC." >&2
   exit 1
@@ -72,6 +78,10 @@ grep -Fq 'SILVER_REFRESH_REGIONS="강원"' "$FAKE_CRONTAB" || {
 }
 grep -Fq 'SILVER_REFRESH_LIMIT=50' "$FAKE_CRONTAB" || {
   echo "Daily Gangwon refresh limit was not installed." >&2
+  exit 1
+}
+grep -Fq 'SILVER_REFRESH_MIN_QUALITY=30' "$FAKE_CRONTAB" || {
+  echo "Daily Gangwon refresh minimum quality was not installed." >&2
   exit 1
 }
 grep -Fq 'refresh-gangwon.log' "$FAKE_CRONTAB" || {
@@ -129,6 +139,22 @@ if PATH="$FAKE_BIN:$PATH" \
   SILVER_CRON_TIMEZONE=invalid \
   bash "$INSTALL_SCRIPT" >/dev/null 2>&1; then
   echo "Invalid cron timezone setting must fail." >&2
+  exit 1
+fi
+
+if PATH="$FAKE_BIN:$PATH" \
+  SILVER_FAKE_CRONTAB="$FAKE_CRONTAB" \
+  SILVER_CORE_REFRESH_MIN_QUALITY=invalid \
+  bash "$INSTALL_SCRIPT" >/dev/null 2>&1; then
+  echo "Invalid core minimum quality setting must fail." >&2
+  exit 1
+fi
+
+if PATH="$FAKE_BIN:$PATH" \
+  SILVER_FAKE_CRONTAB="$FAKE_CRONTAB" \
+  SILVER_GANGWON_CORE_REFRESH_MIN_QUALITY=101 \
+  bash "$INSTALL_SCRIPT" >/dev/null 2>&1; then
+  echo "Invalid Gangwon minimum quality setting must fail." >&2
   exit 1
 fi
 
