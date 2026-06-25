@@ -73,6 +73,11 @@ crontab -l 2>/dev/null \
       /\.\/scripts\/refresh-data\.sh/ { next }
       /\.\/scripts\/backup-postgres\.sh/ { next }
       /\.\/scripts\/backup-volumes\.sh/ { next }
+      /^# Silver Project: daily public data refresh$/ { next }
+      /^# Silver Project: weekly Gangwon-wide core refresh for maps that present Gangwon as a region$/ { next }
+      /^# Silver Project: daily Gangwon-wide core refresh for maps that present Gangwon as a region$/ { next }
+      /^# Silver Project: weekly FoodSafetyKorea refresh, kept separate because MFDS can throttle shared keys$/ { next }
+      /^# Silver Project: daily PostgreSQL backup before public data refresh$/ { next }
       { print }
     ' \
   > "$tmp_cron" || true

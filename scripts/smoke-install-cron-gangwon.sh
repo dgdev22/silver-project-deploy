@@ -31,7 +31,12 @@ run_install() {
   local gangwon_enabled="$1"
   local cron_timezone="${2:-UTC}"
 
-  : > "$FAKE_CRONTAB"
+  cat > "$FAKE_CRONTAB" <<'EOF'
+# Keep unrelated user cron comments
+# Silver Project: daily public data refresh
+# Silver Project: weekly FoodSafetyKorea refresh, kept separate because MFDS can throttle shared keys
+# Silver Project: daily PostgreSQL backup before public data refresh
+EOF
   PATH="$FAKE_BIN:$PATH" \
     SILVER_FAKE_CRONTAB="$FAKE_CRONTAB" \
     SILVER_APP_DIR="$TMP_DIR/app" \
@@ -71,6 +76,22 @@ grep -Fq 'SILVER_REFRESH_LIMIT=50' "$FAKE_CRONTAB" || {
 }
 grep -Fq 'refresh-gangwon.log' "$FAKE_CRONTAB" || {
   echo "Daily Gangwon refresh log was not installed." >&2
+  exit 1
+}
+legacy_comments_before_managed_block="$(
+  awk '
+    /^# BEGIN Silver Project cron$/ { exit }
+    { print }
+  ' "$FAKE_CRONTAB"
+)"
+if printf '%s\n' "$legacy_comments_before_managed_block" | grep -Fq '# Silver Project: daily public data refresh'; then
+  echo "Legacy Silver Project refresh comments must be removed outside the managed block." >&2
+  cat "$FAKE_CRONTAB" >&2
+  exit 1
+fi
+printf '%s\n' "$legacy_comments_before_managed_block" | grep -Fq '# Keep unrelated user cron comments' || {
+  echo "Unrelated user cron comments must be preserved." >&2
+  cat "$FAKE_CRONTAB" >&2
   exit 1
 }
 
